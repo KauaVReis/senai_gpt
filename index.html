@@ -52,11 +52,86 @@
                             style="background:#dd203c"></span> SENAI Red</div>
                 </div>
             </div>
+            <button class="sidebar-btn" id="settings-btn" title="Configurações IA">
+                <i class="fas fa-sliders-h"></i>
+            </button>
             <button class="sidebar-btn" id="toggle-mode" title="Alternar tema">
                 <i class="fas fa-moon"></i>
             </button>
         </div>
     </aside>
+
+    <!-- Settings Panel -->
+    <div class="settings-overlay" id="settings-overlay">
+        <div class="settings-panel">
+            <div class="settings-header">
+                <h3><i class="fas fa-cog"></i> Configurações da IA</h3>
+                <button class="settings-close" id="settings-close"><i class="fas fa-times"></i></button>
+            </div>
+
+            <div class="settings-body">
+                <!-- Modelo -->
+                <div class="settings-group">
+                    <label class="settings-label">Modelo</label>
+                    <select id="model-select" class="settings-select">
+                        <option value="gemini-2.5-flash">Gemini 2.5 Flash (Rápido)</option>
+                        <option value="gemini-2.5-flash-preview-04-17">Gemini 2.5 Flash Preview</option>
+                        <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                        <option value="gemini-1.5-pro">Gemini 1.5 Pro (Avançado)</option>
+                    </select>
+                </div>
+
+                <!-- Temperatura -->
+                <div class="settings-group">
+                    <label class="settings-label">Temperatura: <span id="temp-value">0.7</span></label>
+                    <input type="range" id="temp-slider" class="settings-range" min="0" max="2" step="0.1" value="0.7">
+                    <div class="range-labels">
+                        <span>Preciso</span>
+                        <span>Criativo</span>
+                    </div>
+                </div>
+
+                <!-- Personalidade -->
+                <div class="settings-group">
+                    <label class="settings-label">Personalidade da IA</label>
+                    <div class="personality-grid">
+                        <button class="personality-btn active" data-personality="padrao">
+                            <i class="fas fa-robot"></i>
+                            <span>Padrão</span>
+                            <small>Educado e técnico</small>
+                        </button>
+                        <button class="personality-btn" data-personality="casual">
+                            <i class="fas fa-comments"></i>
+                            <span>Casual</span>
+                            <small>Gírias e descontraído</small>
+                        </button>
+                        <button class="personality-btn" data-personality="tecnico">
+                            <i class="fas fa-laptop-code"></i>
+                            <span>Técnico</span>
+                            <small>Foco em código e dados</small>
+                        </button>
+                        <button class="personality-btn" data-personality="professor">
+                            <i class="fas fa-chalkboard-teacher"></i>
+                            <span>Professor</span>
+                            <small>Didático e explicativo</small>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Prompt personalizado -->
+                <div class="settings-group">
+                    <label class="settings-label">Prompt do Sistema (instruções personalizadas)</label>
+                    <textarea id="custom-prompt" class="settings-textarea" rows="4"
+                        placeholder="Escreva instruções personalizadas para a IA..."></textarea>
+                    <small class="settings-hint">Deixe vazio para usar o prompt da personalidade selecionada</small>
+                </div>
+            </div>
+
+            <div class="settings-footer">
+                <button class="settings-save" id="settings-save"><i class="fas fa-check"></i> Salvar</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Main Content -->
     <main class="main-content">

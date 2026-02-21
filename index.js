@@ -2,16 +2,49 @@
 // Configuração da API Gemini
 // ============================
 // GEMINI_API_KEY vem do arquivo config.js (não versionado)
-const GEMINI_MODEL = 'gemini-2.5-flash';
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+let currentModel = localStorage.getItem('ai-model') || 'gemini-2.5-flash';
+let currentTemperature = parseFloat(localStorage.getItem('ai-temp') || '0.7');
+
+function getGeminiURL() {
+    return `https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:generateContent?key=${GEMINI_API_KEY}`;
+}
 
 // Histórico de conversa para contexto
 let conversationHistory = [];
 
-const SYSTEM_INSTRUCTION = `Você é o SENAI GPT, um assistente virtual inteligente do SENAI (Serviço Nacional de Aprendizagem Industrial). 
-Responda sempre em português brasileiro. Seja educado, claro e útil. 
+// Personalidades da IA
+const PERSONALITIES = {
+    padrao: `Você é o SENAI GPT, um assistente virtual inteligente do SENAI (Serviço Nacional de Aprendizagem Industrial).
+Responda sempre em português brasileiro. Seja educado, claro e útil.
 Você pode ajudar com dúvidas sobre tecnologia, programação, cursos do SENAI, e assuntos gerais.
-Quando receber arquivos, analise-os e descreva seu conteúdo da melhor forma possível.`;
+Quando receber arquivos, analise-os e descreva seu conteúdo da melhor forma possível.`,
+
+    casual: `Você é o SENAI GPT, um assistente super gente boa e descontraído.
+Fale de um jeito casual, use gírias brasileiras (tipo "tá ligado", "mano", "show de bola", "bora", "suave", "firmeza").
+Seja divertido e acessível, como se fosse um amigo explicando as coisas.
+Use emojis de vez em quando 😄🚀. Responda sempre em português brasileiro.
+Mesmo sendo casual, dê informações corretas e úteis.`,
+
+    tecnico: `Você é o SENAI GPT no modo Técnico. Seja direto, objetivo e focado em código.
+Priorize respostas com código, exemplos práticos e documentação técnica.
+Use termos técnicos sem simplificar demais. Inclua comentários no código.
+Evite textos longos desnecessarios — vá direto ao ponto com soluções.
+Sempre que possível, mostre código funcional e completo em português brasileiro.`,
+
+    professor: `Você é o SENAI GPT no modo Professor. Ensine de forma didática e passo a passo.
+Explique conceitos com analogias simples do dia a dia.
+Use exemplos progressivos: começe pelo básico e aumente a complexidade.
+Faça perguntas retoricas para engajar o aluno. Use listas numeradas.
+Inclua "Dica:" e "Atenção:" para destacar pontos importantes.
+Responda sempre em português brasileiro de forma acolhedora.`
+};
+
+let currentPersonality = localStorage.getItem('ai-personality') || 'padrao';
+let customPrompt = localStorage.getItem('ai-custom-prompt') || '';
+
+function getSystemInstruction() {
+    return customPrompt || PERSONALITIES[currentPersonality] || PERSONALITIES.padrao;
+}
 
 // ============================
 // Elementos
@@ -290,6 +323,7 @@ function createMessage(text, sender, files = []) {
         const feedbackWrap = document.createElement('div');
         feedbackWrap.classList.add('msg-feedback');
         feedbackWrap.innerHTML = `
+            <button class="feedback-btn" onclick="speakText(this)" title="Ouvir resposta"><i class="fas fa-volume-up"></i></button>
             <button class="feedback-btn" onclick="handleFeedback(this, 'up')" title="Boa resposta"><i class="fas fa-thumbs-up"></i></button>
             <button class="feedback-btn" onclick="handleFeedback(this, 'down')" title="Resposta ruim"><i class="fas fa-thumbs-down"></i></button>
         `;
@@ -591,7 +625,7 @@ async function callGeminiAPI(text, files = []) {
     // Monta o body da requisição
     const requestBody = {
         system_instruction: {
-            parts: [{ text: SYSTEM_INSTRUCTION }]
+            parts: [{ text: getSystemInstruction() }]
         },
         contents: [
             // Histórico anterior (só texto)
@@ -603,12 +637,12 @@ async function callGeminiAPI(text, files = []) {
             }
         ],
         generationConfig: {
-            temperature: 0.7,
+            temperature: currentTemperature,
             maxOutputTokens: 4096
         }
     };
 
-    const response = await fetch(GEMINI_URL, {
+    const response = await fetch(getGeminiURL(), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestBody)
@@ -834,6 +868,144 @@ document.getElementById('export-chat').addEventListener('click', () => {
     a.click();
     URL.revokeObjectURL(url);
 });
+// ============================
+// Settings Panel
+// ============================
+const settingsOverlay = document.getElementById('settings-overlay');
+const settingsBtn = document.getElementById('settings-btn');
+const settingsClose = document.getElementById('settings-close');
+const settingsSave = document.getElementById('settings-save');
+const modelSelect = document.getElementById('model-select');
+const tempSlider = document.getElementById('temp-slider');
+const tempValue = document.getElementById('temp-value');
+const customPromptInput = document.getElementById('custom-prompt');
+
+// Carrega valores salvos
+modelSelect.value = currentModel;
+tempSlider.value = currentTemperature;
+tempValue.textContent = currentTemperature;
+customPromptInput.value = customPrompt;
+
+// Marca personalidade ativa
+document.querySelectorAll('.personality-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.personality === currentPersonality);
+});
+
+settingsBtn.addEventListener('click', () => {
+    settingsOverlay.classList.add('open');
+});
+
+settingsClose.addEventListener('click', () => {
+    settingsOverlay.classList.remove('open');
+});
+
+settingsOverlay.addEventListener('click', (e) => {
+    if (e.target === settingsOverlay) settingsOverlay.classList.remove('open');
+});
+
+tempSlider.addEventListener('input', () => {
+    tempValue.textContent = tempSlider.value;
+});
+
+document.querySelectorAll('.personality-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.personality-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+    });
+});
+
+settingsSave.addEventListener('click', () => {
+    // Salva modelo
+    currentModel = modelSelect.value;
+    localStorage.setItem('ai-model', currentModel);
+
+    // Salva temperatura
+    currentTemperature = parseFloat(tempSlider.value);
+    localStorage.setItem('ai-temp', currentTemperature);
+
+    // Salva personalidade
+    const activePersonality = document.querySelector('.personality-btn.active');
+    currentPersonality = activePersonality ? activePersonality.dataset.personality : 'padrao';
+    localStorage.setItem('ai-personality', currentPersonality);
+
+    // Salva prompt personalizado
+    customPrompt = customPromptInput.value.trim();
+    localStorage.setItem('ai-custom-prompt', customPrompt);
+
+    // Fecha painel
+    settingsOverlay.classList.remove('open');
+    createMessage('⚙️ Configurações salvas!', 'bot');
+});
+
+// ============================
+// Speech-to-Text (Web Speech API)
+// ============================
+const captureBtn = document.getElementById('capture');
+let isRecording = false;
+let recognition = null;
+
+if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    recognition = new SpeechRecognition();
+    recognition.lang = 'pt-BR';
+    recognition.continuous = false;
+    recognition.interimResults = false;
+
+    recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        promptInput.value = transcript;
+        captureBtn.classList.remove('recording');
+        isRecording = false;
+    };
+
+    recognition.onerror = () => {
+        captureBtn.classList.remove('recording');
+        isRecording = false;
+    };
+
+    recognition.onend = () => {
+        captureBtn.classList.remove('recording');
+        isRecording = false;
+    };
+}
+
+captureBtn.addEventListener('click', () => {
+    if (!recognition) {
+        alert('Seu navegador não suporta reconhecimento de voz.');
+        return;
+    }
+    if (isRecording) {
+        recognition.stop();
+        isRecording = false;
+        captureBtn.classList.remove('recording');
+    } else {
+        recognition.start();
+        isRecording = true;
+        captureBtn.classList.add('recording');
+    }
+});
+
+// ============================
+// Text-to-Speech
+// ============================
+window.speakText = function (btn) {
+    const msgText = btn.closest('.message-content').querySelector('.msg-text');
+    if (!msgText) return;
+
+    if (window.speechSynthesis.speaking) {
+        window.speechSynthesis.cancel();
+        btn.classList.remove('speaking');
+        return;
+    }
+
+    const utterance = new SpeechSynthesisUtterance(msgText.textContent);
+    utterance.lang = 'pt-BR';
+    utterance.rate = 1;
+
+    utterance.onend = () => btn.classList.remove('speaking');
+    btn.classList.add('speaking');
+    window.speechSynthesis.speak(utterance);
+};
 
 // ============================
 // Extra: fadeOut keyframe (injetado)
