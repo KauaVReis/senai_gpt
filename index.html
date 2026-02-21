@@ -1,39 +1,107 @@
 <!DOCTYPE html>
 <html lang="pt-br">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Jarvis GPT</title>
-    
+    <title>SENAI GPT — Assistente IA</title>
+    <meta name="description" content="SENAI GPT — Assistente de inteligência artificial do SENAI.">
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <!-- Favicon -->
+    <link rel="icon" href="img/SENAI-AI 1.png" type="image/png">
+
     <!-- Estilos -->
     <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" integrity="sha512-iBBXm8fW90+nuLcSKlbmrPcLa0OT92xO1BIsZ+ywDWZCvqsWgccV3gFoRBv0z+8dLJgyAHIhR35VZc2oM/gI1w==" crossorigin="anonymous">
-
-    <!-- ou use este para PNG -->
-    <link rel="icon" href="img/SENAI-AI 1.png" type="image/png">
 </head>
+
 <body class="dark-mode">
-    <main>
-        <div class="sidebar"></div>
-        <section class="chat">
-            <img src="img/SENAI-AI 1.png" alt="Jarvis">
-            <h1>SENAI GPT</h1>
 
-            <div class="pergunta">
-                <input type="text" name="prompt" id="prompt" placeholder="Pergunte algo...">
-                <button id="capture"><i class="fas fa-microphone"></i></button>
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="sidebar-top">
+            <button class="sidebar-btn" id="new-chat" title="Novo chat">
+                <i class="fas fa-plus"></i>
+            </button>
+        </div>
+        <div class="sidebar-bottom">
+            <button class="sidebar-btn" id="toggle-mode" title="Alternar tema">
+                <i class="fas fa-moon"></i>
+            </button>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+
+        <!-- Chat Messages Area -->
+        <div class="chat-messages" id="chat-messages">
+            <!-- Welcome Screen -->
+            <div class="welcome" id="welcome">
+                <div class="welcome-logo">
+                    <img src="img/SENAI-AI 1.png" alt="SENAI GPT Logo">
+                    <div class="logo-glow"></div>
+                </div>
+                <h1 class="welcome-title">SENAI <span class="accent">GPT</span></h1>
+                <p class="welcome-subtitle">Como posso te ajudar hoje?</p>
+
+                <div class="suggestion-cards">
+                    <div class="suggestion-card" data-prompt="O que é inteligência artificial?">
+                        <i class="fas fa-lightbulb"></i>
+                        <span>O que é inteligência artificial?</span>
+                    </div>
+                    <div class="suggestion-card" data-prompt="Me explique sobre machine learning">
+                        <i class="fas fa-brain"></i>
+                        <span>Me explique sobre machine learning</span>
+                    </div>
+                    <div class="suggestion-card" data-prompt="Como funciona um chatbot?">
+                        <i class="fas fa-robot"></i>
+                        <span>Como funciona um chatbot?</span>
+                    </div>
+                    <div class="suggestion-card" data-prompt="Quais os cursos do SENAI?">
+                        <i class="fas fa-graduation-cap"></i>
+                        <span>Quais os cursos do SENAI?</span>
+                    </div>
+                </div>
             </div>
+        </div>
 
-            <img src="img/senai_logo.png" alt="Logo do SENAI contendo a sigla da instituição">
-        </section>
-        
-        <!-- Botão para alternar o modo -->
-        <button id="toggle-mode">
-            <i class="fas fa-moon"></i>
-        </button>
+        <!-- Input Area -->
+        <div class="input-area">
+            <!-- File Preview Strip -->
+            <div class="file-preview-strip" id="file-preview-strip"></div>
+
+            <div class="input-wrapper">
+                <!-- Hidden file input -->
+                <input type="file" id="file-input" multiple hidden>
+
+                <button class="input-btn" id="attach-btn" title="Anexar arquivo">
+                    <i class="fas fa-paperclip"></i>
+                </button>
+                <input type="text" name="prompt" id="prompt" placeholder="Escreva sua mensagem..." autocomplete="off">
+                <div class="input-actions">
+                    <button class="input-btn" id="capture" title="Mensagem de voz">
+                        <i class="fas fa-microphone"></i>
+                    </button>
+                    <button class="input-btn send-btn" id="send-btn" title="Enviar">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+            </div>
+            <p class="disclaimer">SENAI GPT pode gerar informações imprecisas. Verifique as respostas importantes.</p>
+        </div>
+
     </main>
 
     <!-- Scripts -->
     <script src="index.js"></script>
 </body>
+
 </html>

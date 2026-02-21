@@ -1,79 +1,677 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
-*{
+/* ============================
+   CSS Variables / Design Tokens
+   ============================ */
+:root {
+    --bg-primary: #ffffff;
+    --bg-secondary: #f7f7f8;
+    --bg-sidebar: #f0f0f1;
+    --bg-input: #ffffff;
+    --text-primary: #1a1a2e;
+    --text-secondary: #6b6b80;
+    --text-muted: #9e9eb0;
+    --border-color: #e5e5e5;
+    --accent: #dd203c;
+    --accent-hover: #c41a33;
+    --accent-glow: rgba(221, 32, 60, 0.25);
+    --card-bg: #ffffff;
+    --card-border: #ebebeb;
+    --card-hover: #f9f9f9;
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
+    --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08);
+    --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.1);
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 20px;
+    --radius-full: 50%;
+    --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+body.dark-mode {
+    --bg-primary: #1a1a2e;
+    --bg-secondary: #16162a;
+    --bg-sidebar: #12122a;
+    --bg-input: #222244;
+    --text-primary: #e8e8f0;
+    --text-secondary: #a0a0b8;
+    --text-muted: #6e6e8a;
+    --border-color: #2e2e4a;
+    --card-bg: #222244;
+    --card-border: #2e2e4a;
+    --card-hover: #2a2a50;
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.2);
+    --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+/* ============================
+   Reset
+   ============================ */
+*,
+*::before,
+*::after {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
 }
 
-body{
-    font-family: 'Inter', sans-serif;
-    transition: background-color 0.5s;
+/* ============================
+   Base
+   ============================ */
+html {
+    font-size: 16px;
+    scroll-behavior: smooth;
 }
 
-main{
+body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
     display: flex;
-    width: 100vw;
-    height: 100vh;
+    min-height: 100vh;
+    overflow: hidden;
+    transition: background-color var(--transition), color var(--transition);
 }
 
-.sidebar{
-    width: 60px;
-    background-color: #dd203c;
+/* ============================
+   Sidebar
+   ============================ */
+.sidebar {
+    width: 64px;
+    min-height: 100vh;
+    background-color: var(--bg-sidebar);
+    border-right: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 0;
+    transition: background-color var(--transition), border-color var(--transition);
+    z-index: 10;
 }
 
-.chat{
-    width: 100vw;
+.sidebar-top,
+.sidebar-bottom {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.sidebar-btn {
+    width: 42px;
+    height: 42px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-color);
+    background-color: transparent;
+    color: var(--text-secondary);
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--transition);
+}
+
+.sidebar-btn:hover {
+    background-color: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+    transform: scale(1.08);
+    box-shadow: 0 0 16px var(--accent-glow);
+}
+
+/* ============================
+   Main Content
+   ============================ */
+.main-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
     height: 100vh;
+    overflow: hidden;
+}
+
+/* ============================
+   Chat Messages Area
+   ============================ */
+.chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 32px 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.chat-messages::-webkit-scrollbar {
+    width: 6px;
+}
+
+.chat-messages::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.chat-messages::-webkit-scrollbar-thumb {
+    background-color: var(--border-color);
+    border-radius: 3px;
+}
+
+/* ============================
+   Welcome Screen
+   ============================ */
+.welcome {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
+    flex: 1;
+    text-align: center;
+    animation: fadeInUp 0.8s ease-out;
+    max-width: 720px;
+    width: 100%;
 }
 
-h1{
-    font-size: 96px;
-    font-weight: bold;
-    margin: 40px 0;
+.welcome-logo {
+    position: relative;
+    margin-bottom: 16px;
 }
 
-.pergunta{
+.welcome-logo img {
+    width: 88px;
+    height: 88px;
+    object-fit: contain;
+    border-radius: var(--radius-lg);
+    animation: float 4s ease-in-out infinite;
+    position: relative;
+    z-index: 1;
+}
+
+.logo-glow {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 120px;
+    height: 120px;
+    background: radial-gradient(circle, var(--accent-glow) 0%, transparent 70%);
+    border-radius: var(--radius-full);
+    animation: pulse-glow 3s ease-in-out infinite;
+}
+
+.welcome-title {
+    font-size: clamp(2.5rem, 5vw, 3.5rem);
+    font-weight: 700;
+    letter-spacing: -1px;
+    margin-bottom: 8px;
+    line-height: 1.1;
+}
+
+.accent {
+    background: linear-gradient(135deg, var(--accent), #ff6b6b);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.welcome-subtitle {
+    font-size: 1.1rem;
+    color: var(--text-secondary);
+    font-weight: 400;
+    margin-bottom: 40px;
+}
+
+/* ============================
+   Suggestion Cards
+   ============================ */
+.suggestion-cards {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    width: 100%;
+    max-width: 560px;
+}
+
+.suggestion-card {
+    background-color: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-md);
+    padding: 16px 18px;
     display: flex;
-    margin: 15vh 0;
-}
-
-input{
-    width: 800px;
-    font-size: 24px;
-    border: none;
-    border-bottom: solid 1px #272727;
-    outline: none;
-    padding: 10px 0;
-    transition: background-color 0.5s;
-}
-
-button{
-    background-color: #dd203c;
-    padding: 20px 25px;
-    border-radius: 50%;
-    border: none;
-    color: white;
+    align-items: center;
+    gap: 12px;
     cursor: pointer;
+    transition: all var(--transition);
+    text-align: left;
 }
 
-body.dark-mode {
-    background-color: #272727;
-    color: #ffffff;
+.suggestion-card i {
+    font-size: 18px;
+    color: var(--accent);
+    flex-shrink: 0;
 }
 
-body.dark-mode input{
-    background-color: #272727;
-    color: #ffffff;
-    border-bottom: solid 1px #ffffff;
+.suggestion-card span {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    line-height: 1.4;
 }
 
-#toggle-mode{
-    width: 60px;
-    height: 60px;
-    margin: 20px;
+.suggestion-card:hover {
+    background-color: var(--card-hover);
+    border-color: var(--accent);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.suggestion-card:hover span {
+    color: var(--text-primary);
+}
+
+/* ============================
+   Chat Bubbles
+   ============================ */
+.message {
+    max-width: 720px;
+    width: 100%;
+    padding: 20px 0;
+    display: flex;
+    gap: 16px;
+    animation: fadeInUp 0.4s ease-out;
+}
+
+.message-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-full);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.message-avatar.user {
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: #fff;
+}
+
+.message-avatar.bot {
+    background: linear-gradient(135deg, var(--accent), #ff6b6b);
+    color: #fff;
+}
+
+.message-content {
+    flex: 1;
+    font-size: 0.95rem;
+    line-height: 1.7;
+    color: var(--text-primary);
+}
+
+.message-content p {
+    margin-bottom: 8px;
+}
+
+/* ============================
+   Typing Indicator
+   ============================ */
+.typing-indicator {
+    display: flex;
+    gap: 5px;
+    padding: 8px 0;
+}
+
+.typing-indicator span {
+    width: 8px;
+    height: 8px;
+    background-color: var(--text-muted);
+    border-radius: var(--radius-full);
+    animation: bounce 1.4s infinite ease-in-out;
+}
+
+.typing-indicator span:nth-child(2) {
+    animation-delay: 0.16s;
+}
+
+.typing-indicator span:nth-child(3) {
+    animation-delay: 0.32s;
+}
+
+/* ============================
+   Input Area
+   ============================ */
+.input-area {
+    padding: 16px 24px 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: linear-gradient(to top, var(--bg-primary) 60%, transparent);
+}
+
+.input-wrapper {
+    max-width: 720px;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    background-color: var(--bg-input);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 6px 6px 6px 6px;
+    transition: all var(--transition);
+    box-shadow: var(--shadow-sm);
+}
+
+/* ============================
+   File Preview Strip
+   ============================ */
+.file-preview-strip {
+    max-width: 720px;
+    width: 100%;
+    display: none;
+    gap: 8px;
+    padding: 8px 4px;
+    overflow-x: auto;
+    scroll-behavior: smooth;
+}
+
+.file-preview-strip.active {
+    display: flex;
+}
+
+.file-preview-strip::-webkit-scrollbar {
+    height: 4px;
+}
+
+.file-preview-strip::-webkit-scrollbar-thumb {
+    background-color: var(--border-color);
+    border-radius: 2px;
+}
+
+.file-preview-card {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background-color: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-sm);
+    padding: 8px 12px;
+    min-width: 180px;
+    max-width: 220px;
+    flex-shrink: 0;
+    animation: fadeInUp 0.3s ease-out;
+}
+
+.file-preview-card .file-thumb {
+    width: 40px;
+    height: 40px;
+    border-radius: 6px;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+.file-preview-card .file-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 6px;
+    background-color: var(--accent);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+}
+
+.file-preview-card .file-info {
+    flex: 1;
+    overflow: hidden;
+}
+
+.file-preview-card .file-name {
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.file-preview-card .file-size {
+    font-size: 0.68rem;
+    color: var(--text-muted);
+}
+
+.file-preview-card .file-remove {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    width: 20px;
+    height: 20px;
+    border-radius: var(--radius-full);
+    background-color: var(--text-muted);
+    color: var(--bg-primary);
+    border: 2px solid var(--bg-primary);
+    font-size: 10px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--transition);
+}
+
+.file-preview-card .file-remove:hover {
+    background-color: var(--accent);
+    transform: scale(1.15);
+}
+
+/* ============================
+   File Attachments in Messages
+   ============================ */
+.message-attachments {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.message-file {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 8px 12px;
+    max-width: 260px;
+}
+
+.message-file .file-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    background-color: var(--accent);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    flex-shrink: 0;
+}
+
+.message-file .file-info .file-name {
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 160px;
+}
+
+.message-file .file-info .file-size {
+    font-size: 0.68rem;
+    color: var(--text-muted);
+}
+
+.message-file-image {
+    max-width: 260px;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+}
+
+.message-file-image img {
+    width: 100%;
+    display: block;
+    border-radius: var(--radius-sm);
+}
+
+.input-wrapper:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow), var(--shadow-md);
+}
+
+.input-wrapper input {
+    flex: 1;
+    border: none;
+    outline: none;
+    background: transparent;
+    font-size: 0.95rem;
+    font-family: 'Inter', sans-serif;
+    color: var(--text-primary);
+    padding: 10px 0;
+}
+
+.input-wrapper input::placeholder {
+    color: var(--text-muted);
+}
+
+.input-actions {
+    display: flex;
+    gap: 4px;
+}
+
+.input-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-md);
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 15px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--transition);
+}
+
+.input-btn:hover {
+    background-color: var(--card-hover);
+    color: var(--text-primary);
+}
+
+.send-btn {
+    background-color: var(--accent);
+    color: #fff !important;
+}
+
+.send-btn:hover {
+    background-color: var(--accent-hover);
+    transform: scale(1.06);
+}
+
+.disclaimer {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 10px;
+    text-align: center;
+}
+
+/* ============================
+   Animations
+   ============================ */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes float {
+
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+
+    50% {
+        transform: translateY(-8px);
+    }
+}
+
+@keyframes pulse-glow {
+
+    0%,
+    100% {
+        opacity: 0.5;
+        transform: translate(-50%, -50%) scale(1);
+    }
+
+    50% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1.15);
+    }
+}
+
+@keyframes bounce {
+
+    0%,
+    80%,
+    100% {
+        transform: scale(0);
+    }
+
+    40% {
+        transform: scale(1);
+    }
+}
+
+/* ============================
+   Responsive
+   ============================ */
+@media (max-width: 768px) {
+    .sidebar {
+        width: 0;
+        padding: 0;
+        border: none;
+        overflow: hidden;
+    }
+
+    .chat-messages {
+        padding: 20px 16px;
+    }
+
+    .suggestion-cards {
+        grid-template-columns: 1fr;
+    }
+
+    .input-area {
+        padding: 12px 12px 16px;
+    }
+
+    .input-wrapper {
+        padding: 4px 4px 4px 16px;
+    }
+
+    .welcome-title {
+        font-size: 2rem;
+    }
 }
