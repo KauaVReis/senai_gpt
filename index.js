@@ -488,7 +488,20 @@ function createMessage(text, sender, files = [], shouldSave = true) {
 
     const avatar = document.createElement('div');
     avatar.classList.add('message-avatar', sender);
-    avatar.textContent = sender === 'user' ? 'U' : 'S';
+
+    if (sender === 'bot') {
+        avatar.innerHTML = '<i class="fas fa-robot"></i>';
+    } else {
+        const userAvatar = localStorage.getItem('user-avatar');
+        if (userAvatar) {
+            avatar.style.backgroundImage = `url(${userAvatar})`;
+            avatar.style.backgroundSize = 'cover';
+            avatar.style.backgroundPosition = 'center';
+            avatar.textContent = '';
+        } else {
+            avatar.textContent = 'U';
+        }
+    }
 
     const content = document.createElement('div');
     content.classList.add('message-content');
@@ -676,13 +689,22 @@ function formatMarkdown(text) {
         // Ícone baseado na linguagem
         const langIcon = getLangIcon(language);
 
+        // Botão Run para JS
+        const isRunnable = ['javascript', 'js'].includes(language.toLowerCase());
+        const runBtn = isRunnable
+            ? `<button class="code-run-btn" onclick="runCode(this)" title="Executar código"><i class="fas fa-play"></i> Run</button>`
+            : '';
+
         codeBlocks.push(
             `<div class="code-canvas">` +
             `<div class="code-header">` +
             `<span class="code-lang">${langIcon} ${language}</span>` +
+            `<div class="code-actions">` +
+            runBtn +
             `<button class="code-copy-btn" onclick="copyCode(this)" title="Copiar código">` +
             `<i class="fas fa-copy"></i> Copiar` +
             `</button>` +
+            `</div>` +
             `</div>` +
             `<pre class="code-body"><code>${numberedLines}</code></pre>` +
             `</div>`
@@ -1205,3 +1227,170 @@ style.textContent = `
     }
 `;
 document.head.appendChild(style);
+
+// ============================
+// Webcam ao Vivo
+// ============================
+const webcamOverlay = document.getElementById('webcam-overlay');
+const webcamVideo = document.getElementById('webcam-video');
+const webcamCanvas = document.getElementById('webcam-canvas');
+let webcamStream = null;
+
+document.getElementById('webcam-btn').addEventListener('click', async () => {
+    try {
+        webcamStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+        webcamVideo.srcObject = webcamStream;
+        webcamOverlay.classList.add('open');
+    } catch (err) {
+        alert('Não foi possível acessar a câmera. Verifique as permissões.');
+    }
+});
+
+function closeWebcam() {
+    if (webcamStream) {
+        webcamStream.getTracks().forEach(t => t.stop());
+        webcamStream = null;
+    }
+    webcamVideo.srcObject = null;
+    webcamOverlay.classList.remove('open');
+}
+
+document.getElementById('webcam-close').addEventListener('click', closeWebcam);
+webcamOverlay.addEventListener('click', (e) => { if (e.target === webcamOverlay) closeWebcam(); });
+
+document.getElementById('webcam-capture').addEventListener('click', () => {
+    webcamCanvas.width = webcamVideo.videoWidth;
+    webcamCanvas.height = webcamVideo.videoHeight;
+    webcamCanvas.getContext('2d').drawImage(webcamVideo, 0, 0);
+
+    webcamCanvas.toBlob(blob => {
+        const file = new File([blob], 'webcam-capture.jpg', { type: 'image/jpeg' });
+        pendingFiles.push(file);
+        renderPreviewStrip();
+        closeWebcam();
+        promptInput.focus();
+    }, 'image/jpeg', 0.85);
+});
+
+// ============================
+// Executor de Código (JS)
+// ============================
+window.runCode = function (btn) {
+    const codeBlock = btn.closest('.code-block');
+    const lines = codeBlock.querySelectorAll('.line-content');
+    let code = '';
+    lines.forEach(line => { code += line.textContent + '\n'; });
+
+    // Remove resultado anterior
+    const existing = codeBlock.querySelector('.code-output');
+    if (existing) existing.remove();
+
+    const outputDiv = document.createElement('div');
+    outputDiv.classList.add('code-output');
+
+    try {
+        // Captura console.log
+        const logs = [];
+        const iframe = document.createElement('iframe');
+        iframe.style.display = 'none';
+        document.body.appendChild(iframe);
+
+        iframe.contentWindow.console = {
+            log: (...args) => logs.push(args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ')),
+            error: (...args) => logs.push('ERROR: ' + args.join(' ')),
+            warn: (...args) => logs.push('WARN: ' + args.join(' '))
+        };
+
+        const result = iframe.contentWindow.eval(code);
+        document.body.removeChild(iframe);
+
+        const output = logs.length > 0 ? logs.join('\n') : (result !== undefined ? String(result) : 'Executado sem saída');
+        outputDiv.innerHTML = `<span class="output-label">Output:</span><pre>${output}</pre>`;
+        outputDiv.classList.add('success');
+    } catch (err) {
+        outputDiv.innerHTML = `<span class="output-label">Erro:</span><pre>${err.message}</pre>`;
+        outputDiv.classList.add('error');
+    }
+
+    codeBlock.appendChild(outputDiv);
+};
+
+// ============================
+// Compartilhar Conversa
+// ============================
+document.getElementById('share-chat').addEventListener('click', () => {
+    const chat = getActiveChat();
+    if (!chat || chat.messages.length === 0) {
+        alert('Nenhuma conversa para compartilhar.');
+        return;
+    }
+
+    const shareData = {
+        title: chat.title,
+        messages: chat.messages.map(m => ({ s: m.sender[0], t: m.text }))
+    };
+
+    const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(shareData))));
+    const url = window.location.origin + window.location.pathname + '#shared=' + encoded;
+
+    navigator.clipboard.writeText(url).then(() => {
+        createMessage('📎 Link copiado para a área de transferência!', 'bot', [], false);
+    }).catch(() => {
+        prompt('Copie o link:', url);
+    });
+});
+
+// Carrega conversa compartilhada via URL
+(function loadSharedChat() {
+    const hash = window.location.hash;
+    if (!hash.startsWith('#shared=')) return;
+
+    try {
+        const data = JSON.parse(decodeURIComponent(escape(atob(hash.replace('#shared=', '')))));
+        createNewChat();
+
+        const chat = getActiveChat();
+        chat.title = '📎 ' + (data.title || 'Compartilhado');
+
+        data.messages.forEach(m => {
+            const sender = m.s === 'u' ? 'user' : 'bot';
+            createMessage(m.t, sender, [], false);
+            chat.messages.push({ sender, text: m.t, timestamp: new Date().toISOString(), starred: false });
+        });
+
+        saveChats();
+        renderChatHistory();
+        window.location.hash = '';
+    } catch (e) {
+        console.warn('Erro ao carregar conversa compartilhada:', e);
+    }
+})();
+
+// ============================
+// Avatar do Usuário (click p/ trocar)
+// ============================
+document.addEventListener('dblclick', (e) => {
+    const avatar = e.target.closest('.message-avatar.user');
+    if (!avatar) return;
+
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = () => {
+        const file = input.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+            localStorage.setItem('user-avatar', reader.result);
+            // Atualiza todos os avatares na tela
+            document.querySelectorAll('.message-avatar.user').forEach(a => {
+                a.style.backgroundImage = `url(${reader.result})`;
+                a.style.backgroundSize = 'cover';
+                a.style.backgroundPosition = 'center';
+                a.textContent = '';
+            });
+        };
+        reader.readAsDataURL(file);
+    };
+    input.click();
+});

@@ -1,0 +1,24 @@
+{
+    "name": "SENAI GPT — Assistente IA",
+    "short_name": "SENAI GPT",
+    "description": "Assistente virtual inteligente do SENAI com IA Gemini",
+    "start_url": "/kaua1/2026/aulaIA/chatBot1/index.html",
+    "display": "standalone",
+    "background_color": "#0f0f1a",
+    "theme_color": "#dd203c",
+    "orientation": "portrait-primary",
+    "icons": [
+        {
+            "src": "img/icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "img/icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable"
+        }
+    ]
+}

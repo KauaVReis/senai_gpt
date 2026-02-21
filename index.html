@@ -18,6 +18,12 @@
     <!-- Favicon -->
     <link rel="icon" href="img/SENAI-AI 1.png" type="image/png">
 
+    <!-- PWA -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#dd203c">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="SENAI GPT">
+
     <!-- Estilos -->
     <link rel="stylesheet" href="style.css">
 </head>
@@ -46,6 +52,9 @@
         <div class="sidebar-bottom">
             <button class="sidebar-btn" id="export-chat" title="Exportar conversa">
                 <i class="fas fa-download"></i>
+            </button>
+            <button class="sidebar-btn" id="share-chat" title="Compartilhar conversa">
+                <i class="fas fa-share-alt"></i>
             </button>
             <div class="theme-selector-wrap">
                 <button class="sidebar-btn" id="theme-selector-btn" title="Temas">
@@ -199,6 +208,9 @@
                 </button>
                 <input type="text" name="prompt" id="prompt" placeholder="Escreva sua mensagem..." autocomplete="off">
                 <div class="input-actions">
+                    <button class="input-btn" id="webcam-btn" title="Câmera ao vivo">
+                        <i class="fas fa-camera"></i>
+                    </button>
                     <button class="input-btn" id="capture" title="Mensagem de voz">
                         <i class="fas fa-microphone"></i>
                     </button>
@@ -212,9 +224,34 @@
 
     </main>
 
+    <!-- Webcam Modal -->
+    <div class="webcam-overlay" id="webcam-overlay">
+        <div class="webcam-panel">
+            <div class="webcam-header">
+                <h3><i class="fas fa-camera"></i> Câmera ao Vivo</h3>
+                <button class="settings-close" id="webcam-close"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="webcam-body">
+                <video id="webcam-video" autoplay playsinline></video>
+                <canvas id="webcam-canvas" style="display:none"></canvas>
+            </div>
+            <div class="webcam-footer">
+                <button class="webcam-capture-btn" id="webcam-capture">
+                    <i class="fas fa-circle"></i> Capturar
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Scripts -->
     <script src="config.js"></script>
     <script src="index.js"></script>
+    <script>
+        // PWA Service Worker
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js').catch(() => { });
+        }
+    </script>
 </body>
 
 </html>
