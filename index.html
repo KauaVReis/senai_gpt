@@ -25,12 +25,24 @@
 <body class="dark-mode">
 
     <!-- Sidebar -->
-    <aside class="sidebar">
+    <aside class="sidebar expanded" id="sidebar">
         <div class="sidebar-top">
             <button class="sidebar-btn" id="new-chat" title="Novo chat">
                 <i class="fas fa-plus"></i>
             </button>
+            <button class="sidebar-btn sidebar-toggle" id="sidebar-toggle" title="Recolher sidebar">
+                <i class="fas fa-bars"></i>
+            </button>
         </div>
+
+        <!-- Chat History -->
+        <div class="chat-history" id="chat-history">
+            <div class="chat-history-label">Conversas</div>
+            <div class="chat-history-list" id="chat-history-list">
+                <!-- Populated dynamically -->
+            </div>
+        </div>
+
         <div class="sidebar-bottom">
             <button class="sidebar-btn" id="export-chat" title="Exportar conversa">
                 <i class="fas fa-download"></i>

@@ -60,9 +60,223 @@ const fileInput = document.getElementById('file-input');
 const attachBtn = document.getElementById('attach-btn');
 const previewStrip = document.getElementById('file-preview-strip');
 const scrollBottomBtn = document.getElementById('scroll-bottom');
+const chatHistoryList = document.getElementById('chat-history-list');
+const sidebar = document.getElementById('sidebar');
 
 let pendingFiles = [];
-let isSending = false; // evita envios duplos
+let isSending = false;
+
+// ============================
+// Persistência (JSON/localStorage)
+// ============================
+const STORAGE_KEY = 'senai-gpt-chats';
+const MAX_CHATS = 50;
+let allChats = [];
+let activeChatId = null;
+
+function loadChats() {
+    try {
+        const data = JSON.parse(localStorage.getItem(STORAGE_KEY));
+        if (data && data.chats) {
+            allChats = data.chats;
+            activeChatId = data.activeChat || null;
+        }
+    } catch (e) {
+        allChats = [];
+        activeChatId = null;
+    }
+}
+
+function saveChats() {
+    // Limita a MAX_CHATS
+    if (allChats.length > MAX_CHATS) {
+        allChats = allChats.slice(-MAX_CHATS);
+    }
+    try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+            chats: allChats,
+            activeChat: activeChatId
+        }));
+    } catch (e) {
+        console.warn('localStorage cheio, removendo chat mais antigo');
+        allChats.shift();
+        saveChats();
+    }
+}
+
+function generateTitle(text) {
+    if (!text) return 'Nova conversa';
+    const words = text.trim().split(/\s+/).slice(0, 6).join(' ');
+    return words.length > 35 ? words.substring(0, 35) + '...' : words;
+}
+
+function getActiveChat() {
+    return allChats.find(c => c.id === activeChatId) || null;
+}
+
+function addMessageToChat(sender, text) {
+    const chat = getActiveChat();
+    if (!chat) return;
+    chat.messages.push({
+        sender,
+        text,
+        timestamp: new Date().toISOString(),
+        starred: false
+    });
+    // Atualiza título na primeira mensagem do usuário
+    if (sender === 'user' && chat.messages.filter(m => m.sender === 'user').length === 1) {
+        chat.title = generateTitle(text);
+    }
+    saveChats();
+    renderChatHistory();
+}
+
+function createNewChat() {
+    const chat = {
+        id: 'chat_' + Date.now(),
+        title: 'Nova conversa',
+        createdAt: new Date().toISOString(),
+        messages: []
+    };
+    allChats.push(chat);
+    activeChatId = chat.id;
+    conversationHistory = [];
+    saveChats();
+    renderChatHistory();
+    showWelcome();
+}
+
+function switchChat(chatId) {
+    const chat = allChats.find(c => c.id === chatId);
+    if (!chat) return;
+    activeChatId = chatId;
+    saveChats();
+
+    // Limpa a tela
+    chatMessages.innerHTML = '';
+    conversationHistory = [];
+
+    if (chat.messages.length === 0) {
+        showWelcome();
+    } else {
+        // Reconstrói mensagens na tela
+        chat.messages.forEach(m => {
+            createMessage(m.text, m.sender, [], false); // false = não salvar de novo
+        });
+        // Reconstrói histórico da API
+        chat.messages.forEach(m => {
+            conversationHistory.push({
+                role: m.sender === 'user' ? 'user' : 'model',
+                parts: [{ text: m.text }]
+            });
+        });
+    }
+    renderChatHistory();
+}
+
+function deleteChat(chatId) {
+    allChats = allChats.filter(c => c.id !== chatId);
+    if (activeChatId === chatId) {
+        if (allChats.length > 0) {
+            switchChat(allChats[allChats.length - 1].id);
+        } else {
+            activeChatId = null;
+            createNewChat();
+        }
+    }
+    saveChats();
+    renderChatHistory();
+}
+
+function renderChatHistory() {
+    if (!chatHistoryList) return;
+    chatHistoryList.innerHTML = '';
+
+    // Mais recente primeiro
+    const sorted = [...allChats].reverse();
+    sorted.forEach(chat => {
+        const item = document.createElement('div');
+        item.classList.add('chat-history-item');
+        if (chat.id === activeChatId) item.classList.add('active');
+
+        item.innerHTML = `
+            <div class="chat-item-info" onclick="window._switchChat('${chat.id}')">
+                <span class="chat-item-title">${chat.title}</span>
+                <span class="chat-item-date">${new Date(chat.createdAt).toLocaleDateString('pt-BR')}</span>
+            </div>
+            <button class="chat-item-delete" onclick="event.stopPropagation(); window._deleteChat('${chat.id}')" title="Deletar">
+                <i class="fas fa-trash-alt"></i>
+            </button>
+        `;
+        chatHistoryList.appendChild(item);
+    });
+}
+
+// Expor para onclick inline
+window._switchChat = switchChat;
+window._deleteChat = deleteChat;
+
+function showWelcome() {
+    chatMessages.innerHTML = `
+        <div class="welcome" id="welcome">
+            <div class="welcome-logo">
+                <img src="img/SENAI-AI 1.png" alt="SENAI GPT Logo">
+                <div class="logo-glow"></div>
+            </div>
+            <h1 class="welcome-title">SENAI <span class="accent">GPT</span></h1>
+            <p class="welcome-subtitle">Como posso te ajudar hoje?</p>
+            <div class="suggestion-cards">
+                <div class="suggestion-card" data-prompt="O que é inteligência artificial?">
+                    <i class="fas fa-lightbulb"></i>
+                    <span>O que é inteligência artificial?</span>
+                </div>
+                <div class="suggestion-card" data-prompt="Me explique sobre machine learning">
+                    <i class="fas fa-brain"></i>
+                    <span>Me explique sobre machine learning</span>
+                </div>
+                <div class="suggestion-card" data-prompt="Como funciona um chatbot?">
+                    <i class="fas fa-robot"></i>
+                    <span>Como funciona um chatbot?</span>
+                </div>
+                <div class="suggestion-card" data-prompt="Quais os cursos do SENAI?">
+                    <i class="fas fa-graduation-cap"></i>
+                    <span>Quais os cursos do SENAI?</span>
+                </div>
+            </div>
+        </div>
+    `;
+    // Re-bind suggestion cards
+    document.querySelectorAll('.suggestion-card').forEach(card => {
+        card.addEventListener('click', () => {
+            promptInput.value = card.getAttribute('data-prompt');
+            sendMessage();
+        });
+    });
+}
+
+// Sidebar toggle
+document.getElementById('sidebar-toggle').addEventListener('click', () => {
+    sidebar.classList.toggle('expanded');
+    localStorage.setItem('sidebar-expanded', sidebar.classList.contains('expanded'));
+});
+
+// Restaura estado da sidebar
+if (localStorage.getItem('sidebar-expanded') === 'false') {
+    sidebar.classList.remove('expanded');
+}
+
+// Inicializa persistência
+loadChats();
+if (allChats.length === 0) {
+    createNewChat();
+} else {
+    renderChatHistory();
+    if (activeChatId) {
+        switchChat(activeChatId);
+    } else {
+        switchChat(allChats[allChats.length - 1].id);
+    }
+}
 
 // ============================
 // Scroll-to-Bottom Button
@@ -268,7 +482,7 @@ function hideWelcome() {
     }
 }
 
-function createMessage(text, sender, files = []) {
+function createMessage(text, sender, files = [], shouldSave = true) {
     const msg = document.createElement('div');
     msg.classList.add('message');
 
@@ -319,7 +533,7 @@ function createMessage(text, sender, files = []) {
     }
 
     // Feedback buttons (só nas mensagens do bot)
-    if (sender === 'bot' && text && !text.startsWith('⚠️')) {
+    if (sender === 'bot' && text && !text.startsWith('⚠️') && !text.startsWith('⚙️') && !text.startsWith('⏳')) {
         const feedbackWrap = document.createElement('div');
         feedbackWrap.classList.add('msg-feedback');
         feedbackWrap.innerHTML = `
@@ -334,6 +548,11 @@ function createMessage(text, sender, files = []) {
     msg.appendChild(content);
     chatMessages.appendChild(msg);
     chatMessages.scrollTop = chatMessages.scrollHeight;
+
+    // Auto-save
+    if (shouldSave && text) {
+        addMessageToChat(sender, text);
+    }
 
     return content; // retorna content para streaming
 }
@@ -688,6 +907,11 @@ async function sendMessage() {
 
     hideWelcome();
     createMessage(text, 'user', files);
+
+    // Se não tem chat ativo, cria um
+    if (!activeChatId || !getActiveChat()) {
+        createNewChat();
+    }
     promptInput.value = '';
     pendingFiles = [];
     renderPreviewStrip();
@@ -715,12 +939,15 @@ async function sendMessage() {
             removeTyping();
 
             // Streaming typewriter effect
-            const botContent = createMessage('', 'bot');
+            const botContent = createMessage('', 'bot', [], false); // não salva vazio
             const textDiv = botContent.querySelector('.msg-text') || document.createElement('div');
             textDiv.classList.add('msg-text');
             if (!botContent.querySelector('.msg-text')) botContent.insertBefore(textDiv, botContent.querySelector('.msg-feedback'));
 
             await typewriterEffect(textDiv, botReply);
+
+            // Salva a resposta completa do bot
+            addMessageToChat('bot', botReply);
 
             lastError = null;
             break;
@@ -768,47 +995,7 @@ suggestionCards.forEach(card => {
 // Botão Novo Chat
 // ============================
 document.getElementById('new-chat').addEventListener('click', () => {
-    conversationHistory = [];
-    chatMessages.innerHTML = '';
-
-    // Recria tela de boas-vindas
-    chatMessages.innerHTML = `
-        <div class="welcome" id="welcome">
-            <div class="welcome-logo">
-                <img src="img/SENAI-AI 1.png" alt="SENAI GPT Logo">
-                <div class="logo-glow"></div>
-            </div>
-            <h1 class="welcome-title">SENAI <span class="accent">GPT</span></h1>
-            <p class="welcome-subtitle">Como posso te ajudar hoje?</p>
-            <div class="suggestion-cards">
-                <div class="suggestion-card" data-prompt="O que é inteligência artificial?">
-                    <i class="fas fa-lightbulb"></i>
-                    <span>O que é inteligência artificial?</span>
-                </div>
-                <div class="suggestion-card" data-prompt="Me explique sobre machine learning">
-                    <i class="fas fa-brain"></i>
-                    <span>Me explique sobre machine learning</span>
-                </div>
-                <div class="suggestion-card" data-prompt="Como funciona um chatbot?">
-                    <i class="fas fa-robot"></i>
-                    <span>Como funciona um chatbot?</span>
-                </div>
-                <div class="suggestion-card" data-prompt="Quais os cursos do SENAI?">
-                    <i class="fas fa-graduation-cap"></i>
-                    <span>Quais os cursos do SENAI?</span>
-                </div>
-            </div>
-        </div>
-    `;
-
-    // Re-bind suggestion cards
-    document.querySelectorAll('.suggestion-card').forEach(card => {
-        card.addEventListener('click', () => {
-            const prompt = card.getAttribute('data-prompt');
-            promptInput.value = prompt;
-            sendMessage();
-        });
-    });
+    createNewChat();
 });
 
 // ============================
