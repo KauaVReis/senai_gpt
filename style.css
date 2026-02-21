@@ -315,6 +315,234 @@ body {
 }
 
 /* ============================
+   Code Canvas (estilo ChatGPT/Gemini)
+   ============================ */
+.code-canvas {
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    margin: 12px 0;
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-sm);
+    font-family: 'Courier New', 'Fira Code', 'Consolas', monospace;
+}
+
+.code-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 16px;
+    background-color: #2d2d3f;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+body:not(.dark-mode) .code-header {
+    background-color: #e8e8ec;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.code-lang {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #b0b0c0;
+    text-transform: capitalize;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'Inter', sans-serif;
+}
+
+body:not(.dark-mode) .code-lang {
+    color: #6b6b80;
+}
+
+.code-lang i {
+    font-size: 12px;
+}
+
+.code-copy-btn {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #b0b0c0;
+    font-size: 0.72rem;
+    font-family: 'Inter', sans-serif;
+    padding: 4px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    transition: all var(--transition);
+}
+
+body:not(.dark-mode) .code-copy-btn {
+    border-color: rgba(0, 0, 0, 0.15);
+    color: #6b6b80;
+}
+
+.code-copy-btn:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+    color: #fff;
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+body:not(.dark-mode) .code-copy-btn:hover {
+    background-color: rgba(0, 0, 0, 0.06);
+    color: #333;
+}
+
+.code-copy-btn.copied {
+    color: #4ade80;
+    border-color: #4ade80;
+}
+
+.code-body {
+    margin: 0;
+    padding: 12px 16px;
+    background-color: #1e1e2e;
+    overflow-x: auto;
+    font-size: 0.84rem;
+    line-height: 1.45;
+}
+
+body:not(.dark-mode) .code-body {
+    background-color: #f6f6f8;
+}
+
+.code-body code {
+    color: #e0e0f0;
+    font-family: 'Courier New', 'Fira Code', 'Consolas', monospace;
+    display: block;
+    white-space: pre;
+}
+
+body:not(.dark-mode) .code-body code {
+    color: #2d2d3f;
+}
+
+.code-line {
+    display: block;
+}
+
+.code-line:hover {
+    background-color: rgba(255, 255, 255, 0.04);
+}
+
+body:not(.dark-mode) .code-line:hover {
+    background-color: rgba(0, 0, 0, 0.03);
+}
+
+.line-number {
+    display: inline-block;
+    width: 32px;
+    text-align: right;
+    padding-right: 12px;
+    color: #555570;
+    user-select: none;
+    font-size: 0.78rem;
+}
+
+body:not(.dark-mode) .line-number {
+    color: #aaa;
+}
+
+.code-body::-webkit-scrollbar {
+    height: 6px;
+}
+
+.code-body::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.code-body::-webkit-scrollbar-thumb {
+    background-color: rgba(255, 255, 255, 0.12);
+    border-radius: 3px;
+}
+
+/* Inline code */
+.inline-code {
+    background-color: rgba(221, 32, 60, 0.1);
+    color: var(--accent);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.88em;
+    font-family: 'Courier New', 'Fira Code', 'Consolas', monospace;
+}
+
+.line-content {
+    flex: 1;
+}
+
+/* ============================
+   Syntax Highlighting Colors (Monokai-inspired)
+   ============================ */
+.hl-comment {
+    color: #6a9955;
+    font-style: italic;
+}
+
+.hl-string {
+    color: #ce9178;
+}
+
+.hl-keyword {
+    color: #c586c0;
+    font-weight: 600;
+}
+
+.hl-builtin {
+    color: #4fc1ff;
+}
+
+.hl-number {
+    color: #b5cea8;
+}
+
+.hl-operator {
+    color: #d4d4d4;
+}
+
+.hl-decorator {
+    color: #dcdcaa;
+}
+
+.hl-tag {
+    color: #569cd6;
+}
+
+/* Light mode syntax colors */
+body:not(.dark-mode) .hl-comment {
+    color: #008000;
+}
+
+body:not(.dark-mode) .hl-string {
+    color: #a31515;
+}
+
+body:not(.dark-mode) .hl-keyword {
+    color: #af00db;
+}
+
+body:not(.dark-mode) .hl-builtin {
+    color: #267f99;
+}
+
+body:not(.dark-mode) .hl-number {
+    color: #098658;
+}
+
+body:not(.dark-mode) .hl-operator {
+    color: #383838;
+}
+
+body:not(.dark-mode) .hl-decorator {
+    color: #795e26;
+}
+
+body:not(.dark-mode) .hl-tag {
+    color: #800000;
+}
+
+/* ============================
    Typing Indicator
    ============================ */
 .typing-indicator {

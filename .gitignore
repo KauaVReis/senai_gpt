@@ -1,0 +1,20 @@
+# Sistema
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Dependências
+node_modules/
+
+# Logs
+*.log
+
+# Gemini
+.gemini/
+config.js

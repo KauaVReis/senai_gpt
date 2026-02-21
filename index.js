@@ -1,8 +1,8 @@
 // ============================
 // Configuração da API Gemini
 // ============================
-const GEMINI_API_KEY = 'AIzaSyDXzG18s80JiQjsx0vbRZbcxorq2zp_Bxw';
-const GEMINI_MODEL = 'gemini-2.5-flash-preview-04-17';
+// GEMINI_API_KEY vem do arquivo config.js (não versionado)
+const GEMINI_MODEL = 'gemini-2.5-flash';
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
 
 // Histórico de conversa para contexto
@@ -248,20 +248,181 @@ function createMessage(text, sender, files = []) {
     return content; // retorna content para streaming
 }
 
-// Formata markdown básico para HTML
-function formatMarkdown(text) {
-    return text
-        // Code blocks ```
-        .replace(/```(\w*)\n?([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
-        // Inline code `
-        .replace(/`([^`]+)`/g, '<code>$1</code>')
-        // Bold **text**
-        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-        // Italic *text*
-        .replace(/\*(.+?)\*/g, '<em>$1</em>')
-        // Line breaks
-        .replace(/\n/g, '<br>');
+// ============================
+// Syntax Highlighting
+// ============================
+function getLangIcon(lang) {
+    const icons = {
+        'python': '<i class="fab fa-python"></i>',
+        'javascript': '<i class="fab fa-js-square"></i>',
+        'js': '<i class="fab fa-js-square"></i>',
+        'html': '<i class="fab fa-html5"></i>',
+        'css': '<i class="fab fa-css3-alt"></i>',
+        'java': '<i class="fab fa-java"></i>',
+        'php': '<i class="fab fa-php"></i>',
+        'node': '<i class="fab fa-node-js"></i>',
+        'react': '<i class="fab fa-react"></i>',
+        'sql': '<i class="fas fa-database"></i>',
+        'bash': '<i class="fas fa-terminal"></i>',
+        'shell': '<i class="fas fa-terminal"></i>',
+        'json': '<i class="fas fa-brackets-curly"></i>',
+        'git': '<i class="fab fa-git-alt"></i>',
+    };
+    return icons[lang.toLowerCase()] || '<i class="fas fa-code"></i>';
 }
+
+function highlightSyntax(code, lang) {
+    const l = lang.toLowerCase();
+
+    // Tokens protegidos (substituídos por placeholders para não interferir entre si)
+    const tokens = [];
+    function protect(match, className) {
+        const idx = tokens.length;
+        tokens.push(`<span class="hl-${className}">${match}</span>`);
+        return `%%TOKEN_${idx}%%`;
+    }
+
+    // 1. Comentários multilinha
+    code = code.replace(/(\/\*[\s\S]*?\*\/)/g, m => protect(m, 'comment'));
+    // Comentários de linha (# ou //)
+    code = code.replace(/((?:\/\/|#).*)$/gm, m => protect(m, 'comment'));
+
+    // 2. Strings (aspas triplas python, depois aspas simples/duplas)
+    code = code.replace(/("""[\s\S]*?"""|'''[\s\S]*?''')/g, m => protect(m, 'string'));
+    code = code.replace(/("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')/g, m => protect(m, 'string'));
+    // Template strings JS
+    code = code.replace(/(`(?:[^`\\]|\\.)*`)/g, m => protect(m, 'string'));
+
+    // 3. Decorators (Python)
+    code = code.replace(/(@\w+)/g, m => protect(m, 'decorator'));
+
+    // 4. Números
+    code = code.replace(/\b(\d+\.?\d*(?:e[+-]?\d+)?)\b/gi, m => protect(m, 'number'));
+
+    // 5. Keywords por linguagem
+    let keywords;
+    if (['python', 'py'].includes(l)) {
+        keywords = 'False|None|True|and|as|assert|async|await|break|class|continue|def|del|elif|else|except|finally|for|from|global|if|import|in|is|lambda|not|or|pass|raise|return|try|while|with|yield';
+    } else if (['javascript', 'js', 'typescript', 'ts', 'jsx', 'tsx'].includes(l)) {
+        keywords = 'abstract|arguments|await|break|case|catch|class|const|continue|debugger|default|delete|do|else|enum|export|extends|finally|for|from|function|if|implements|import|in|instanceof|interface|let|new|null|of|package|private|protected|public|return|static|super|switch|this|throw|try|typeof|undefined|var|void|while|with|yield|async|true|false';
+    } else if (['java', 'c', 'cpp', 'csharp', 'cs'].includes(l)) {
+        keywords = 'abstract|assert|boolean|break|byte|case|catch|char|class|const|continue|default|do|double|else|enum|extends|final|finally|float|for|goto|if|implements|import|instanceof|int|interface|long|native|new|null|package|private|protected|public|return|short|static|strictfp|super|switch|synchronized|this|throw|throws|transient|try|void|volatile|while|true|false|string|var|using|namespace';
+    } else if (['php'].includes(l)) {
+        keywords = 'abstract|and|array|as|break|callable|case|catch|class|clone|const|continue|declare|default|die|do|echo|else|elseif|empty|enddeclare|endfor|endforeach|endif|endswitch|endwhile|eval|exit|extends|final|finally|fn|for|foreach|function|global|goto|if|implements|include|include_once|instanceof|insteadof|interface|isset|list|match|namespace|new|null|or|print|private|protected|public|require|require_once|return|static|switch|throw|trait|try|unset|use|var|while|xor|yield|true|false';
+    } else if (['sql'].includes(l)) {
+        keywords = 'SELECT|FROM|WHERE|INSERT|INTO|VALUES|UPDATE|SET|DELETE|CREATE|TABLE|DROP|ALTER|ADD|INDEX|JOIN|INNER|LEFT|RIGHT|OUTER|ON|AND|OR|NOT|NULL|IS|IN|BETWEEN|LIKE|ORDER|BY|GROUP|HAVING|LIMIT|DISTINCT|AS|COUNT|SUM|AVG|MAX|MIN|PRIMARY|KEY|FOREIGN|REFERENCES|INT|VARCHAR|TEXT|DATE|BOOLEAN';
+    } else {
+        keywords = 'if|else|for|while|do|switch|case|break|continue|return|function|class|const|let|var|new|try|catch|throw|import|export|from|default|null|true|false|void|int|string|float|double|boolean';
+    }
+    code = code.replace(new RegExp(`\\b(${keywords})\\b`, 'g'), m => protect(m, 'keyword'));
+
+    // 6. Built-in functions
+    let builtins;
+    if (['python', 'py'].includes(l)) {
+        builtins = 'print|len|range|input|int|str|float|list|dict|set|tuple|type|isinstance|enumerate|zip|map|filter|sorted|reversed|open|format|abs|max|min|sum|round|any|all|hasattr|getattr|setattr|super|property|classmethod|staticmethod';
+    } else if (['javascript', 'js', 'typescript', 'ts'].includes(l)) {
+        builtins = 'console|log|warn|error|info|parseInt|parseFloat|isNaN|isFinite|decodeURI|encodeURI|setTimeout|setInterval|clearTimeout|clearInterval|fetch|alert|prompt|confirm|Math|JSON|Array|Object|String|Number|Boolean|Date|Promise|Map|Set|RegExp|Error|document|window|require|module|process';
+    } else {
+        builtins = 'print|println|printf|scanf|cout|cin|System|Math|String|Arrays|Collections|ArrayList|HashMap|IOException';
+    }
+    code = code.replace(new RegExp(`\\b(${builtins})\\b`, 'g'), m => protect(m, 'builtin'));
+
+    // 7. Operadores
+    code = code.replace(/(===|!==|==|!=|&lt;=|&gt;=|=&gt;|&lt;|&gt;|\+\+|--|\|\||&amp;&amp;)/g, m => protect(m, 'operator'));
+
+    // 8. HTML tags (para html/xml)
+    if (['html', 'xml', 'svg', 'jsx', 'tsx'].includes(l)) {
+        code = code.replace(/(&lt;\/?)([\w-]+)/g, (match, bracket, tag) => {
+            return protect(bracket, 'operator') + protect(tag, 'tag');
+        });
+    }
+
+    // Restaura tokens
+    let result = code;
+    tokens.forEach((token, i) => {
+        result = result.replace(`%%TOKEN_${i}%%`, token);
+    });
+
+    return result;
+}
+
+// Formata markdown para HTML com code blocks estilizados
+function formatMarkdown(text) {
+    // Primeiro: protege code blocks ```
+    const codeBlocks = [];
+    text = text.replace(/```(\w*)\n?([\s\S]*?)```/g, (match, lang, code) => {
+        const index = codeBlocks.length;
+        const language = lang || 'code';
+        const escapedCode = code.replace(/</g, '&lt;').replace(/>/g, '&gt;').trimEnd();
+
+        // Aplica syntax highlighting
+        const highlightedCode = highlightSyntax(escapedCode, language);
+
+        // Gera linhas numeradas com highlight
+        const lines = highlightedCode.split('\n');
+        const numberedLines = lines.map((line, i) =>
+            `<span class="code-line"><span class="line-number">${i + 1}</span><span class="line-content">${line}</span></span>`
+        ).join('\n');
+
+        // Ícone baseado na linguagem
+        const langIcon = getLangIcon(language);
+
+        codeBlocks.push(
+            `<div class="code-canvas">` +
+            `<div class="code-header">` +
+            `<span class="code-lang">${langIcon} ${language}</span>` +
+            `<button class="code-copy-btn" onclick="copyCode(this)" title="Copiar código">` +
+            `<i class="fas fa-copy"></i> Copiar` +
+            `</button>` +
+            `</div>` +
+            `<pre class="code-body"><code>${numberedLines}</code></pre>` +
+            `</div>`
+        );
+        return `%%CODEBLOCK_${index}%%`;
+    });
+
+    // Inline code `
+    text = text.replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>');
+    // Bold **text**
+    text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    // Italic *text*
+    text = text.replace(/\*(.+?)\*/g, '<em>$1</em>');
+    // Line breaks
+    text = text.replace(/\n/g, '<br>');
+
+    // Restaura code blocks
+    codeBlocks.forEach((block, i) => {
+        text = text.replace(`%%CODEBLOCK_${i}%%`, block);
+    });
+
+    return text;
+}
+
+// Função global para copiar código
+window.copyCode = function (btn) {
+    const codeBody = btn.closest('.code-canvas').querySelector('code');
+    // Pega só o texto, sem os números de linha
+    const lines = codeBody.querySelectorAll('.code-line');
+    let codeText = '';
+    lines.forEach(line => {
+        // Pega o texto sem o número de linha
+        const clone = line.cloneNode(true);
+        const lineNum = clone.querySelector('.line-number');
+        if (lineNum) lineNum.remove();
+        codeText += clone.textContent + '\n';
+    });
+
+    navigator.clipboard.writeText(codeText.trimEnd()).then(() => {
+        const icon = btn.querySelector('i');
+        const originalHTML = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-check"></i> Copiado!';
+        btn.classList.add('copied');
+        setTimeout(() => {
+            btn.innerHTML = originalHTML;
+            btn.classList.remove('copied');
+        }, 2000);
+    });
+};
 
 function showTyping() {
     const msg = document.createElement('div');
