@@ -26,31 +26,75 @@ const suggestionCards = document.querySelectorAll('.suggestion-card');
 const fileInput = document.getElementById('file-input');
 const attachBtn = document.getElementById('attach-btn');
 const previewStrip = document.getElementById('file-preview-strip');
+const scrollBottomBtn = document.getElementById('scroll-bottom');
 
 let pendingFiles = [];
 let isSending = false; // evita envios duplos
 
 // ============================
-// Tema (Dark / Light)
+// Scroll-to-Bottom Button
 // ============================
+chatMessages.addEventListener('scroll', () => {
+    const distanceFromBottom = chatMessages.scrollHeight - chatMessages.scrollTop - chatMessages.clientHeight;
+    scrollBottomBtn.classList.toggle('visible', distanceFromBottom > 150);
+});
+
+scrollBottomBtn.addEventListener('click', () => {
+    chatMessages.scrollTo({ top: chatMessages.scrollHeight, behavior: 'smooth' });
+});
+
+// ============================
+// Sistema de Temas (5 temas)
+// ============================
+const themeDropdown = document.getElementById('theme-dropdown');
+const themeSelectorBtn = document.getElementById('theme-selector-btn');
+let rateLimitCooldown = 0; // em ms, 0 = desativado
+let lastSendTime = 0;
+
 function applyTheme(theme) {
+    // Remove todas as classes de tema
+    document.body.classList.remove('dark-mode', 'theme-midnight', 'theme-ocean', 'theme-senai');
+
     if (theme === 'light') {
-        document.body.classList.remove('dark-mode');
         toggleIcon.classList.replace('fa-moon', 'fa-sun');
     } else {
         document.body.classList.add('dark-mode');
         toggleIcon.classList.replace('fa-sun', 'fa-moon');
+        if (theme === 'midnight') document.body.classList.add('theme-midnight');
+        if (theme === 'ocean') document.body.classList.add('theme-ocean');
+        if (theme === 'senai') document.body.classList.add('theme-senai');
     }
+
+    // Marca tema ativo no dropdown
+    document.querySelectorAll('.theme-option').forEach(opt => {
+        opt.classList.toggle('active', opt.dataset.theme === theme);
+    });
+
     localStorage.setItem('theme', theme);
 }
 
-const savedTheme = localStorage.getItem('theme');
-if (savedTheme) applyTheme(savedTheme);
+const savedTheme = localStorage.getItem('theme') || 'dark';
+applyTheme(savedTheme);
 
 toggleBtn.addEventListener('click', () => {
     const isDark = document.body.classList.contains('dark-mode');
     applyTheme(isDark ? 'light' : 'dark');
 });
+
+// Theme dropdown
+themeSelectorBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    themeDropdown.classList.toggle('open');
+});
+
+document.querySelectorAll('.theme-option').forEach(opt => {
+    opt.addEventListener('click', () => {
+        applyTheme(opt.dataset.theme);
+        themeDropdown.classList.remove('open');
+    });
+});
+
+document.addEventListener('click', () => themeDropdown.classList.remove('open'));
 
 // ============================
 // Utilitários de arquivo
@@ -236,8 +280,20 @@ function createMessage(text, sender, files = []) {
     // Texto (suporta markdown simples)
     if (text) {
         const textDiv = document.createElement('div');
+        textDiv.classList.add('msg-text');
         textDiv.innerHTML = formatMarkdown(text);
         content.appendChild(textDiv);
+    }
+
+    // Feedback buttons (só nas mensagens do bot)
+    if (sender === 'bot' && text && !text.startsWith('⚠️')) {
+        const feedbackWrap = document.createElement('div');
+        feedbackWrap.classList.add('msg-feedback');
+        feedbackWrap.innerHTML = `
+            <button class="feedback-btn" onclick="handleFeedback(this, 'up')" title="Boa resposta"><i class="fas fa-thumbs-up"></i></button>
+            <button class="feedback-btn" onclick="handleFeedback(this, 'down')" title="Resposta ruim"><i class="fas fa-thumbs-down"></i></button>
+        `;
+        content.appendChild(feedbackWrap);
     }
 
     msg.appendChild(avatar);
@@ -383,10 +439,50 @@ function formatMarkdown(text) {
 
     // Inline code `
     text = text.replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>');
+
+    // Tables (markdown)
+    text = text.replace(/((?:^\|.+\|$\n?)+)/gm, (tableBlock) => {
+        const rows = tableBlock.trim().split('\n').filter(r => r.trim());
+        if (rows.length < 2) return tableBlock;
+        let html = '<div class="md-table-wrap"><table class="md-table">';
+        rows.forEach((row, i) => {
+            if (row.replace(/[|\-\s:]/g, '') === '') return; // separador
+            const cells = row.split('|').filter(c => c !== '').map(c => c.trim());
+            const tag = i === 0 ? 'th' : 'td';
+            html += '<tr>' + cells.map(c => `<${tag}>${c}</${tag}>`).join('') + '</tr>';
+        });
+        html += '</table></div>';
+        return html;
+    });
+
+    // Headings ### ## #
+    text = text.replace(/^### (.+)$/gm, '<h4 class="md-h">$1</h4>');
+    text = text.replace(/^## (.+)$/gm, '<h3 class="md-h">$1</h3>');
+    text = text.replace(/^# (.+)$/gm, '<h2 class="md-h">$1</h2>');
+
     // Bold **text**
     text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
     // Italic *text*
     text = text.replace(/\*(.+?)\*/g, '<em>$1</em>');
+
+    // Unordered lists (- item)
+    text = text.replace(/((?:^- .+$\n?)+)/gm, (listBlock) => {
+        const items = listBlock.trim().split('\n').map(l => l.replace(/^- /, '').trim());
+        return '<ul class="md-list">' + items.map(i => `<li>${i}</li>`).join('') + '</ul>';
+    });
+
+    // Ordered lists (1. item)
+    text = text.replace(/((?:^\d+\. .+$\n?)+)/gm, (listBlock) => {
+        const items = listBlock.trim().split('\n').map(l => l.replace(/^\d+\. /, '').trim());
+        return '<ol class="md-list">' + items.map(i => `<li>${i}</li>`).join('') + '</ol>';
+    });
+
+    // Links [text](url)
+    text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" class="md-link">$1</a>');
+
+    // Horizontal rule ---
+    text = text.replace(/^---$/gm, '<hr class="md-hr">');
+
     // Line breaks
     text = text.replace(/\n/g, '<br>');
 
@@ -435,10 +531,16 @@ function showTyping() {
 
     const content = document.createElement('div');
     content.classList.add('message-content');
-    const indicator = document.createElement('div');
-    indicator.classList.add('typing-indicator');
-    indicator.innerHTML = '<span></span><span></span><span></span>';
-    content.appendChild(indicator);
+
+    // Skeleton loading
+    const skeleton = document.createElement('div');
+    skeleton.classList.add('skeleton-loader');
+    skeleton.innerHTML = `
+        <div class="skeleton-line" style="width: 85%"></div>
+        <div class="skeleton-line" style="width: 65%"></div>
+        <div class="skeleton-line short" style="width: 45%"></div>
+    `;
+    content.appendChild(skeleton);
 
     msg.appendChild(avatar);
     msg.appendChild(content);
@@ -556,21 +658,56 @@ async function sendMessage() {
     pendingFiles = [];
     renderPreviewStrip();
 
+    // Rate limiting check
+    if (rateLimitCooldown > 0) {
+        const timeSince = Date.now() - lastSendTime;
+        if (timeSince < rateLimitCooldown) {
+            const waitSec = Math.ceil((rateLimitCooldown - timeSince) / 1000);
+            createMessage(`⏳ Aguarde ${waitSec}s antes de enviar outra mensagem.`, 'bot');
+            isSending = false;
+            sendBtn.disabled = false;
+            return;
+        }
+    }
+    lastSendTime = Date.now();
+
     showTyping();
 
-    try {
-        const botReply = await callGeminiAPI(text, files);
-        removeTyping();
-        createMessage(botReply, 'bot');
-    } catch (error) {
-        removeTyping();
-        console.error('Erro na API Gemini:', error);
-        createMessage(`⚠️ Erro: ${error.message}`, 'bot');
-    } finally {
-        isSending = false;
-        sendBtn.disabled = false;
-        promptInput.focus();
+    // Error retry (até 3 tentativas)
+    let lastError;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+            const botReply = await callGeminiAPI(text, files);
+            removeTyping();
+
+            // Streaming typewriter effect
+            const botContent = createMessage('', 'bot');
+            const textDiv = botContent.querySelector('.msg-text') || document.createElement('div');
+            textDiv.classList.add('msg-text');
+            if (!botContent.querySelector('.msg-text')) botContent.insertBefore(textDiv, botContent.querySelector('.msg-feedback'));
+
+            await typewriterEffect(textDiv, botReply);
+
+            lastError = null;
+            break;
+        } catch (error) {
+            lastError = error;
+            console.warn(`Tentativa ${attempt}/3 falhou:`, error.message);
+            if (attempt < 3) {
+                await new Promise(r => setTimeout(r, 1000 * attempt));
+            }
+        }
     }
+
+    if (lastError) {
+        removeTyping();
+        console.error('Erro na API Gemini após 3 tentativas:', lastError);
+        createMessage(`⚠️ Erro: ${lastError.message}`, 'bot');
+    }
+
+    isSending = false;
+    sendBtn.disabled = false;
+    promptInput.focus();
 }
 
 sendBtn.addEventListener('click', sendMessage);
@@ -638,6 +775,64 @@ document.getElementById('new-chat').addEventListener('click', () => {
             sendMessage();
         });
     });
+});
+
+// ============================
+// Streaming Typewriter Effect
+// ============================
+async function typewriterEffect(element, text) {
+    const formattedHTML = formatMarkdown(text);
+    // Insere de uma vez com delay visual
+    const words = text.split(' ');
+    let current = '';
+    for (let i = 0; i < words.length; i++) {
+        current += (i > 0 ? ' ' : '') + words[i];
+        element.innerHTML = formatMarkdown(current);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+        // Velocidade: mais rápido com mais palavras
+        const delay = words.length > 100 ? 8 : words.length > 50 ? 15 : 25;
+        await new Promise(r => setTimeout(r, delay));
+    }
+    // Renderiza final completo
+    element.innerHTML = formattedHTML;
+}
+
+// ============================
+// Feedback 👍👎
+// ============================
+window.handleFeedback = function (btn, type) {
+    const wrap = btn.closest('.msg-feedback');
+    wrap.querySelectorAll('.feedback-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    btn.classList.add(type === 'up' ? 'liked' : 'disliked');
+};
+
+// ============================
+// Exportar Chat
+// ============================
+document.getElementById('export-chat').addEventListener('click', () => {
+    const messages = chatMessages.querySelectorAll('.message');
+    if (messages.length === 0) return;
+
+    let exportText = '=== SENAI GPT — Conversa Exportada ===\n';
+    exportText += `Data: ${new Date().toLocaleString('pt-BR')}\n\n`;
+
+    messages.forEach(msg => {
+        if (msg.id === 'typing-msg') return;
+        const avatar = msg.querySelector('.message-avatar');
+        const content = msg.querySelector('.msg-text');
+        if (!content) return;
+        const sender = avatar.classList.contains('bot') ? 'SENAI GPT' : 'Você';
+        exportText += `[${sender}]\n${content.textContent.trim()}\n\n`;
+    });
+
+    const blob = new Blob([exportText], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `senai-gpt-${Date.now()}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
 });
 
 // ============================
