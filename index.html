@@ -87,6 +87,9 @@
             <button class="sidebar-btn" id="agents-btn" title="Agentes Especializados">
                 <i class="fas fa-user-cog"></i>
             </button>
+            <button class="sidebar-btn" id="compare-btn" title="Comparar Modelos">
+                <i class="fas fa-columns"></i>
+            </button>
             <button class="sidebar-btn" id="share-chat" title="Compartilhar conversa">
                 <i class="fas fa-share-alt"></i>
             </button>
@@ -438,6 +441,52 @@
                     <i class="fas fa-search-plus" style="color:#8b5cf6"></i>
                     <div><strong>Agente de Pesquisa</strong><br><small>Pesquisador acadêmico</small></div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Multi-Model Comparison Modal -->
+    <div class="templates-overlay" id="compare-overlay">
+        <div class="templates-panel" style="max-width:620px">
+            <div class="templates-header">
+                <h3><i class="fas fa-columns"></i> Comparar Modelos</h3>
+                <button class="settings-close" id="compare-close"><i class="fas fa-times"></i></button>
+            </div>
+            <div style="padding:16px;display:flex;flex-direction:column;gap:14px">
+                <p style="font-size:0.82rem;color:var(--text-secondary);margin:0">
+                    Envie a mesma pergunta para dois modelos e compare as respostas lado a lado.
+                </p>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                    <div>
+                        <label
+                            style="font-size:0.75rem;font-weight:600;color:var(--text-primary);display:block;margin-bottom:4px">
+                            🅰️ Modelo A
+                        </label>
+                        <select id="compare-model-a"
+                            style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--border-color);background:var(--bg-input);color:var(--text-primary);font-size:0.8rem">
+                        </select>
+                    </div>
+                    <div>
+                        <label
+                            style="font-size:0.75rem;font-weight:600;color:var(--text-primary);display:block;margin-bottom:4px">
+                            🅱️ Modelo B
+                        </label>
+                        <select id="compare-model-b"
+                            style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--border-color);background:var(--bg-input);color:var(--text-primary);font-size:0.8rem">
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label
+                        style="font-size:0.75rem;font-weight:600;color:var(--text-primary);display:block;margin-bottom:4px">
+                        💬 Pergunta para comparar
+                    </label>
+                    <textarea id="compare-prompt" rows="3" placeholder="Ex: Explique o que é recursão em programação..."
+                        style="width:100%;padding:10px;border-radius:6px;border:1px solid var(--border-color);background:var(--bg-input);color:var(--text-primary);font-size:0.85rem;font-family:'Inter',sans-serif;resize:vertical"></textarea>
+                </div>
+                <button id="compare-send" class="settings-save" style="width:100%">
+                    <i class="fas fa-play"></i> Comparar Respostas
+                </button>
             </div>
         </div>
     </div>

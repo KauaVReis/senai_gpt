@@ -2189,3 +2189,220 @@ window.copyMermaidImage = function (btn) {
     };
     img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
 };
+
+// ============================
+// RODADA 3 — Multi-Model Comparison
+// ============================
+const compareBtn = document.getElementById('compare-btn');
+const compareOverlay = document.getElementById('compare-overlay');
+const compareClose = document.getElementById('compare-close');
+const compareSend = document.getElementById('compare-send');
+
+if (compareBtn) {
+    compareBtn.addEventListener('click', () => compareOverlay?.classList.add('open'));
+}
+if (compareClose) {
+    compareClose.addEventListener('click', () => compareOverlay?.classList.remove('open'));
+}
+if (compareOverlay) {
+    compareOverlay.addEventListener('click', (e) => {
+        if (e.target === compareOverlay) compareOverlay.classList.remove('open');
+    });
+}
+
+// Populate compare selects from TIER_MODELS
+function populateCompareSelects() {
+    const selA = document.getElementById('compare-model-a');
+    const selB = document.getElementById('compare-model-b');
+    if (!selA || !selB) return;
+
+    const TIER_LABELS = { classic: '⚡ Classic', perfect: '🎯 Perfect', ultimate: '🚀 Ultimate', ultra: '💎 Ultra' };
+    const PROVIDER_LABELS = { gemini: '🤖 Gemini', openrouter: '🌐 OpenRouter' };
+
+    [selA, selB].forEach((sel, idx) => {
+        sel.innerHTML = '';
+        for (const [provider, tiers] of Object.entries(TIER_MODELS)) {
+            const group = document.createElement('optgroup');
+            group.label = PROVIDER_LABELS[provider] || provider;
+            for (const [tier, modelId] of Object.entries(tiers)) {
+                const opt = document.createElement('option');
+                opt.value = modelId;
+                opt.textContent = `${TIER_LABELS[tier] || tier} — ${modelId}`;
+                group.appendChild(opt);
+            }
+            sel.appendChild(group);
+        }
+        // Default: A = first gemini, B = first openrouter
+        const geminiModels = Object.values(TIER_MODELS.gemini || {});
+        const orModels = Object.values(TIER_MODELS.openrouter || {});
+        if (idx === 0 && geminiModels.length) sel.value = geminiModels[1] || geminiModels[0]; // perfect tier
+        if (idx === 1 && orModels.length) sel.value = orModels[1] || orModels[0];
+    });
+}
+populateCompareSelects();
+
+async function callModelDirect(modelId, prompt) {
+    const isGemini = modelId.startsWith('gemini-');
+    const start = Date.now();
+
+    if (isGemini) {
+        // Gemini API
+        const apiKey = localStorage.getItem('api-key-gemini') || '';
+        if (!apiKey) throw new Error('Chave Gemini não configurada');
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{ role: 'user', parts: [{ text: prompt }] }],
+                generationConfig: { temperature: currentTemperature, maxOutputTokens: 2048 }
+            })
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err?.error?.message || `Gemini HTTP ${res.status}`);
+        }
+        const data = await res.json();
+        const text = data.candidates?.[0]?.content?.parts?.[0]?.text || 'Sem resposta';
+        return { text, time: Date.now() - start, model: modelId };
+    } else {
+        // OpenRouter API
+        const apiKey = localStorage.getItem('api-key-openrouter') || '';
+        if (!apiKey) throw new Error('Chave OpenRouter não configurada');
+        const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`,
+                'HTTP-Referer': window.location.origin,
+                'X-Title': 'INOVA SENAI'
+            },
+            body: JSON.stringify({
+                model: modelId,
+                messages: [
+                    { role: 'system', content: getSystemInstruction() },
+                    { role: 'user', content: prompt }
+                ],
+                temperature: currentTemperature,
+                max_tokens: 2048
+            })
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err?.error?.message || `OpenRouter HTTP ${res.status}`);
+        }
+        const data = await res.json();
+        const text = data.choices?.[0]?.message?.content || 'Sem resposta';
+        return { text, time: Date.now() - start, model: modelId };
+    }
+}
+
+function createComparisonView(prompt, modelA, modelB) {
+    // User message
+    createMessage(prompt, 'user');
+
+    // Split view container
+    const msg = document.createElement('div');
+    msg.classList.add('message');
+
+    const avatar = document.createElement('div');
+    avatar.classList.add('message-avatar', 'bot');
+    avatar.innerHTML = '<i class="fas fa-robot"></i>';
+
+    const content = document.createElement('div');
+    content.classList.add('message-content');
+
+    const label = document.createElement('div');
+    label.classList.add('msg-text');
+    label.innerHTML = '<strong>⚡ Comparação Multi-Modelo</strong>';
+    content.appendChild(label);
+
+    const split = document.createElement('div');
+    split.classList.add('compare-split');
+    split.innerHTML = `
+        <div class="compare-card" id="compare-result-a">
+            <div class="compare-card-header model-a"><i class="fas fa-robot"></i> ${modelA}</div>
+            <div class="compare-card-body compare-skeleton">
+                <div class="skel-line"></div>
+                <div class="skel-line"></div>
+                <div class="skel-line"></div>
+            </div>
+        </div>
+        <div class="compare-card" id="compare-result-b">
+            <div class="compare-card-header model-b"><i class="fas fa-robot"></i> ${modelB}</div>
+            <div class="compare-card-body compare-skeleton">
+                <div class="skel-line"></div>
+                <div class="skel-line"></div>
+                <div class="skel-line"></div>
+            </div>
+        </div>
+    `;
+    content.appendChild(split);
+
+    msg.appendChild(avatar);
+    msg.appendChild(content);
+    chatMessages.appendChild(msg);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+
+    return split;
+}
+
+if (compareSend) {
+    compareSend.addEventListener('click', async () => {
+        const modelA = document.getElementById('compare-model-a').value;
+        const modelB = document.getElementById('compare-model-b').value;
+        const prompt = document.getElementById('compare-prompt').value.trim();
+
+        if (!prompt) {
+            document.getElementById('compare-prompt').focus();
+            return;
+        }
+
+        compareOverlay.classList.remove('open');
+
+        const split = createComparisonView(prompt, modelA, modelB);
+        const cardA = split.querySelector('#compare-result-a');
+        const cardB = split.querySelector('#compare-result-b');
+
+        // Call both models in parallel
+        const [resultA, resultB] = await Promise.allSettled([
+            callModelDirect(modelA, prompt),
+            callModelDirect(modelB, prompt)
+        ]);
+
+        // Render Model A
+        const bodyA = cardA.querySelector('.compare-card-body');
+        if (resultA.status === 'fulfilled') {
+            bodyA.classList.remove('compare-skeleton');
+            bodyA.innerHTML = `<div class="msg-text">${formatMarkdown(resultA.value.text)}</div>`;
+            const footerA = document.createElement('div');
+            footerA.classList.add('compare-card-footer');
+            footerA.innerHTML = `<span>⏱️ ${(resultA.value.time / 1000).toFixed(1)}s</span><span>~${Math.ceil(resultA.value.text.length / 4)} tokens</span>`;
+            cardA.appendChild(footerA);
+        } else {
+            bodyA.classList.remove('compare-skeleton');
+            bodyA.innerHTML = `<div class="msg-text" style="color:var(--accent)">⚠️ ${resultA.reason.message}</div>`;
+        }
+
+        // Render Model B
+        const bodyB = cardB.querySelector('.compare-card-body');
+        if (resultB.status === 'fulfilled') {
+            bodyB.classList.remove('compare-skeleton');
+            bodyB.innerHTML = `<div class="msg-text">${formatMarkdown(resultB.value.text)}</div>`;
+            const footerB = document.createElement('div');
+            footerB.classList.add('compare-card-footer');
+            footerB.innerHTML = `<span>⏱️ ${(resultB.value.time / 1000).toFixed(1)}s</span><span>~${Math.ceil(resultB.value.text.length / 4)} tokens</span>`;
+            cardB.appendChild(footerB);
+        } else {
+            bodyB.classList.remove('compare-skeleton');
+            bodyB.innerHTML = `<div class="msg-text" style="color:var(--accent)">⚠️ ${resultB.reason.message}</div>`;
+        }
+
+        // Render Mermaid if present
+        setTimeout(renderMermaidDiagrams, 200);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+
+        // Play notification
+        playNotificationSound?.();
+    });
+}
