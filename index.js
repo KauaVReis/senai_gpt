@@ -550,9 +550,18 @@ function createMessage(text, sender, files = [], shouldSave = true) {
         const feedbackWrap = document.createElement('div');
         feedbackWrap.classList.add('msg-feedback');
         feedbackWrap.innerHTML = `
+            <button class="feedback-btn" onclick="toggleStar(this)" title="Favoritar"><i class="far fa-star"></i></button>
             <button class="feedback-btn" onclick="speakText(this)" title="Ouvir resposta"><i class="fas fa-volume-up"></i></button>
             <button class="feedback-btn" onclick="handleFeedback(this, 'up')" title="Boa resposta"><i class="fas fa-thumbs-up"></i></button>
             <button class="feedback-btn" onclick="handleFeedback(this, 'down')" title="Resposta ruim"><i class="fas fa-thumbs-down"></i></button>
+        `;
+        content.appendChild(feedbackWrap);
+    } else if (sender === 'user' && text) {
+        // Star para usuário também
+        const feedbackWrap = document.createElement('div');
+        feedbackWrap.classList.add('msg-feedback');
+        feedbackWrap.innerHTML = `
+            <button class="feedback-btn" onclick="toggleStar(this)" title="Favoritar"><i class="far fa-star"></i></button>
         `;
         content.appendChild(feedbackWrap);
     }
@@ -1394,3 +1403,35 @@ document.addEventListener('dblclick', (e) => {
     };
     input.click();
 });
+
+// ============================
+// Favoritar Mensagem (Star)
+// ============================
+window.toggleStar = function (btn) {
+    const icon = btn.querySelector('i');
+    const msgDiv = btn.closest('.message');
+    const text = msgDiv.querySelector('.msg-text')?.textContent || "";
+
+    const chat = getActiveChat();
+    if (!chat) return;
+
+    // Encontra a mensagem no histórico do chat ativo
+    // Usamos o texto e a posição relativa para identificar
+    const msgObj = chat.messages.find(m => m.text === text && !m.starred);
+    // Se não achar uma não favoritada, procura qualquer uma (toggle off)
+    const target = msgObj || chat.messages.find(m => m.text === text);
+
+    if (target) {
+        target.starred = !target.starred;
+        if (target.starred) {
+            icon.classList.replace('far', 'fas');
+            icon.style.color = '#f59e0b'; // Gold
+            btn.title = "Remover favorito";
+        } else {
+            icon.classList.replace('fas', 'far');
+            icon.style.color = '';
+            btn.title = "Favoritar";
+        }
+        saveChats();
+    }
+};

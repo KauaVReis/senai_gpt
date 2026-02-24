@@ -1706,3 +1706,186 @@ h4.md-h {
         font-size: 0.68rem;
     }
 }
+
+/* ============================
+   Phase 5 - Avançado (Frontend Only)
+   ============================ */
+
+/* Webcam Modal */
+.webcam-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(5px);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+}
+
+.webcam-overlay.open {
+    display: flex;
+}
+
+.webcam-panel {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    width: 90%;
+    max-width: 500px;
+    overflow: hidden;
+    box-shadow: var(--shadow-lg);
+    animation: slideUp 0.3s ease-out;
+}
+
+.webcam-header {
+    padding: 16px;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.webcam-header h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.webcam-body {
+    background: #000;
+    position: relative;
+    aspect-ratio: 4/3;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#webcam-video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.webcam-footer {
+    padding: 16px;
+    display: flex;
+    justify-content: center;
+}
+
+.webcam-capture-btn {
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 30px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: transform 0.2s, background 0.2s;
+}
+
+.webcam-capture-btn:hover {
+    background: var(--accent-hover);
+    transform: scale(1.05);
+}
+
+.webcam-capture-btn i {
+    font-size: 0.8rem;
+    color: #fff;
+}
+
+/* Code Executor */
+.code-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.code-run-btn {
+    background: #10b981;
+    color: white;
+    border: none;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    transition: background 0.2s;
+}
+
+.code-run-btn:hover {
+    background: #059669;
+}
+
+.code-output {
+    margin-top: 12px;
+    padding: 12px;
+    border-radius: 8px;
+    font-family: 'Fira Code', 'Courier New', monospace;
+    font-size: 0.85rem;
+    border: 1px solid var(--border-color);
+}
+
+.code-output.success {
+    background: rgba(16, 185, 129, 0.1);
+    border-color: rgba(16, 185, 129, 0.3);
+}
+
+.code-output.error {
+    background: rgba(239, 68, 68, 0.1);
+    border-color: rgba(239, 68, 68, 0.3);
+}
+
+.output-label {
+    display: block;
+    font-size: 0.7rem;
+    font-weight: bold;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+    color: var(--text-muted);
+}
+
+.code-output pre {
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-all;
+    color: var(--text-primary);
+}
+
+/* Updated Avatars */
+.message-avatar.bot i {
+    font-size: 1.2rem;
+    color: var(--accent);
+}
+
+.message-avatar.user {
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
+
+.message-avatar.user:hover {
+    opacity: 0.8;
+}
+
+/* Share animations */
+@keyframes slideUp {
+    from {
+        transform: translateY(20px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
