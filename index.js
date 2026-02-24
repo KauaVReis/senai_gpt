@@ -1,12 +1,40 @@
 // ============================
-// Configuração da API Gemini
+// INOVA SENAI — Sistema Híbrido de IA
 // ============================
-// GEMINI_API_KEY vem do arquivo config.js (não versionado)
-let currentModel = localStorage.getItem('ai-model') || 'gemini-2.5-flash';
-let currentTemperature = parseFloat(localStorage.getItem('ai-temp') || '0.7');
 
-function getGeminiURL() {
-    return `https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:generateContent?key=${GEMINI_API_KEY}`;
+// Tier Mappings
+const TIER_MODELS = {
+    gemini: {
+        classic: 'gemini-2.5-flash-lite',
+        perfect: 'gemini-2.5-flash',
+        ultimate: 'gemini-2.5-pro',
+        ultra: 'gemini-3.1-pro-preview'
+    },
+    openrouter: {
+        classic: 'arcee-ai/trinity-mini:free',
+        perfect: 'nvidia/nemotron-3-nano-30b-a3b:free',
+        ultimate: 'stepfun/step-3.5-flash:free',
+        ultra: 'arcee-ai/trinity-large-preview:free'
+    }
+};
+
+// Config from localStorage (no config.js needed)
+let currentProvider = localStorage.getItem('ai-provider') || 'gemini';
+let currentTier = localStorage.getItem('ai-tier') || 'perfect';
+let currentModel = TIER_MODELS[currentProvider]?.[currentTier] || 'gemini-2.5-flash';
+let currentTemperature = parseFloat(localStorage.getItem('ai-temp') || '0.7');
+let openrouterBaseUrl = localStorage.getItem('openrouter-url') || 'https://openrouter.ai/api/v1/chat/completions';
+
+function getApiKey() {
+    return localStorage.getItem(`api-key-${currentProvider}`) || '';
+}
+
+function getGeminiStreamURL() {
+    return `https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:streamGenerateContent?alt=sse&key=${getApiKey()}`;
+}
+
+function getGeminiFallbackURL() {
+    return `https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:generateContent?key=${getApiKey()}`;
 }
 
 // Histórico de conversa para contexto
@@ -14,24 +42,24 @@ let conversationHistory = [];
 
 // Personalidades da IA
 const PERSONALITIES = {
-    padrao: `Você é o SENAI GPT, um assistente virtual inteligente do SENAI (Serviço Nacional de Aprendizagem Industrial).
+    padrao: `Você é o INOVA SENAI, um assistente virtual inteligente do SENAI (Serviço Nacional de Aprendizagem Industrial).
 Responda sempre em português brasileiro. Seja educado, claro e útil.
 Você pode ajudar com dúvidas sobre tecnologia, programação, cursos do SENAI, e assuntos gerais.
 Quando receber arquivos, analise-os e descreva seu conteúdo da melhor forma possível.`,
 
-    casual: `Você é o SENAI GPT, um assistente super gente boa e descontraído.
+    casual: `Você é o INOVA SENAI, um assistente super gente boa e descontraído.
 Fale de um jeito casual, use gírias brasileiras (tipo "tá ligado", "mano", "show de bola", "bora", "suave", "firmeza").
 Seja divertido e acessível, como se fosse um amigo explicando as coisas.
 Use emojis de vez em quando 😄🚀. Responda sempre em português brasileiro.
 Mesmo sendo casual, dê informações corretas e úteis.`,
 
-    tecnico: `Você é o SENAI GPT no modo Técnico. Seja direto, objetivo e focado em código.
+    tecnico: `Você é o INOVA SENAI no modo Técnico. Seja direto, objetivo e focado em código.
 Priorize respostas com código, exemplos práticos e documentação técnica.
 Use termos técnicos sem simplificar demais. Inclua comentários no código.
 Evite textos longos desnecessarios — vá direto ao ponto com soluções.
 Sempre que possível, mostre código funcional e completo em português brasileiro.`,
 
-    professor: `Você é o SENAI GPT no modo Professor. Ensine de forma didática e passo a passo.
+    professor: `Você é o INOVA SENAI no modo Professor. Ensine de forma didática e passo a passo.
 Explique conceitos com analogias simples do dia a dia.
 Use exemplos progressivos: começe pelo básico e aumente a complexidade.
 Faça perguntas retoricas para engajar o aluno. Use listas numeradas.
@@ -65,11 +93,12 @@ const sidebar = document.getElementById('sidebar');
 
 let pendingFiles = [];
 let isSending = false;
+let currentAbortController = null;
 
 // ============================
 // Persistência (JSON/localStorage)
 // ============================
-const STORAGE_KEY = 'senai-gpt-chats';
+const STORAGE_KEY = 'inova-senai-chats';
 const MAX_CHATS = 50;
 let allChats = [];
 let activeChatId = null;
@@ -220,10 +249,10 @@ function showWelcome() {
     chatMessages.innerHTML = `
         <div class="welcome" id="welcome">
             <div class="welcome-logo">
-                <img src="img/SENAI-AI 1.png" alt="SENAI GPT Logo">
+                <img src="img/SENAI-AI 1.png" alt="INOVA SENAI Logo">
                 <div class="logo-glow"></div>
             </div>
-            <h1 class="welcome-title">SENAI <span class="accent">GPT</span></h1>
+            <h1 class="welcome-title">INOVA <span class="accent">SENAI</span></h1>
             <p class="welcome-subtitle">Como posso te ajudar hoje?</p>
             <div class="suggestion-cards">
                 <div class="suggestion-card" data-prompt="O que é inteligência artificial?">
@@ -811,7 +840,7 @@ function showTyping() {
 
     const avatar = document.createElement('div');
     avatar.classList.add('message-avatar', 'bot');
-    avatar.textContent = 'S';
+    avatar.innerHTML = '<i class="fas fa-robot"></i>';
 
     const content = document.createElement('div');
     content.classList.add('message-content');
@@ -838,10 +867,22 @@ function removeTyping() {
 }
 
 // ============================
-// Chamada à API Gemini
+// Chamada à API — Sistema Híbrido com Streaming SSE
 // ============================
-async function callGeminiAPI(text, files = []) {
-    // Monta as parts da mensagem do usuário
+async function callAPI(text, files = [], abortSignal) {
+    const apiKey = getApiKey();
+    if (!apiKey) {
+        throw new Error('Chave de API não configurada. Vá em Configurações e adicione sua API Key.');
+    }
+
+    if (currentProvider === 'gemini') {
+        return await callGeminiStreaming(text, files, abortSignal);
+    } else {
+        return await callOpenRouterStreaming(text, abortSignal);
+    }
+}
+
+async function callGeminiStreaming(text, files, abortSignal) {
     const userParts = [];
 
     // Adiciona arquivos como inlineData
@@ -859,32 +900,25 @@ async function callGeminiAPI(text, files = []) {
         }
     }
 
-    // Adiciona o texto
     if (text) {
-        userParts.push({ text: text });
+        userParts.push({ text });
     } else if (files.length > 0) {
         userParts.push({ text: 'Analise o(s) arquivo(s) enviado(s) e descreva seu conteúdo.' });
     }
 
-    // Adiciona ao histórico
-    conversationHistory.push({
-        role: 'user',
-        parts: userParts.filter(p => p.text) // histórico só guarda texto
-    });
+    // Histórico no formato Gemini
+    const geminiHistory = conversationHistory.map(m => ({
+        role: m.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: m.text }]
+    }));
 
-    // Monta o body da requisição
     const requestBody = {
         system_instruction: {
             parts: [{ text: getSystemInstruction() }]
         },
         contents: [
-            // Histórico anterior (só texto)
-            ...conversationHistory.slice(0, -1),
-            // Mensagem atual (com arquivos)
-            {
-                role: 'user',
-                parts: userParts
-            }
+            ...geminiHistory,
+            { role: 'user', parts: userParts }
         ],
         generationConfig: {
             temperature: currentTemperature,
@@ -892,34 +926,129 @@ async function callGeminiAPI(text, files = []) {
         }
     };
 
-    const response = await fetch(getGeminiURL(), {
+    // Tenta streaming SSE primeiro
+    try {
+        const response = await fetch(getGeminiStreamURL(), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(requestBody),
+            signal: abortSignal
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData?.error?.message || `Erro HTTP ${response.status}`);
+        }
+
+        return { stream: response.body, type: 'gemini-sse' };
+    } catch (err) {
+        if (err.name === 'AbortError') throw err;
+        // Fallback para não-streaming
+        const response = await fetch(getGeminiFallbackURL(), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(requestBody),
+            signal: abortSignal
+        });
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData?.error?.message || `Erro HTTP ${response.status}`);
+        }
+        const data = await response.json();
+        const botText = data?.candidates?.[0]?.content?.parts?.[0]?.text || 'Sem resposta.';
+        return { text: botText, type: 'fallback' };
+    }
+}
+
+async function callOpenRouterStreaming(text, abortSignal) {
+    const messages = [
+        { role: 'system', content: getSystemInstruction() },
+        ...conversationHistory.map(m => ({ role: m.role, content: m.text })),
+        { role: 'user', content: text }
+    ];
+
+    const response = await fetch(openrouterBaseUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody)
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${getApiKey()}`,
+            'HTTP-Referer': window.location.origin,
+            'X-Title': 'INOVA SENAI'
+        },
+        body: JSON.stringify({
+            model: currentModel,
+            messages,
+            temperature: currentTemperature,
+            max_tokens: 4096,
+            stream: true
+        }),
+        signal: abortSignal
     });
 
     if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        const errorMsg = errorData?.error?.message || `Erro HTTP ${response.status}`;
-        throw new Error(errorMsg);
+        throw new Error(errorData?.error?.message || `Erro HTTP ${response.status}`);
     }
 
-    const data = await response.json();
-    const botText = data?.candidates?.[0]?.content?.parts?.[0]?.text
-        || 'Não consegui gerar uma resposta. Tente novamente.';
+    return { stream: response.body, type: 'openrouter-sse' };
+}
 
-    // Salva resposta no histórico
-    conversationHistory.push({
-        role: 'model',
-        parts: [{ text: botText }]
-    });
-
-    // Limita histórico para não exceder limites da API
-    if (conversationHistory.length > 20) {
-        conversationHistory = conversationHistory.slice(-20);
+// Processa stream SSE e retorna texto completo
+async function processStream(result, textElement) {
+    if (result.type === 'fallback') {
+        textElement.innerHTML = formatMarkdown(result.text);
+        return result.text;
     }
 
-    return botText;
+    const reader = result.stream.getReader();
+    const decoder = new TextDecoder();
+    let fullText = '';
+    let buffer = '';
+
+    try {
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+
+            for (const line of lines) {
+                if (!line.startsWith('data: ')) continue;
+                const data = line.slice(6).trim();
+                if (data === '[DONE]') continue;
+
+                try {
+                    const parsed = JSON.parse(data);
+                    let token = '';
+
+                    if (result.type === 'gemini-sse') {
+                        token = parsed?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                    } else {
+                        token = parsed?.choices?.[0]?.delta?.content || '';
+                    }
+
+                    if (token) {
+                        fullText += token;
+                        textElement.innerHTML = formatMarkdown(fullText);
+                        chatMessages.scrollTop = chatMessages.scrollHeight;
+                    }
+                } catch (e) { /* ignore parse errors */ }
+            }
+        }
+    } catch (err) {
+        if (err.name === 'AbortError') {
+            fullText += ' *[Interrompido]*';
+            textElement.innerHTML = formatMarkdown(fullText);
+        } else {
+            throw err;
+        }
+    } finally {
+        reader.releaseLock();
+    }
+
+    return fullText;
 }
 
 // ============================
@@ -929,12 +1058,35 @@ async function sendMessage() {
     if (isSending) return;
 
     const text = promptInput.value.trim();
-    const files = [...pendingFiles];
+    let files = [...pendingFiles];
 
     if (!text && files.length === 0) return;
 
+    // Validação de ficheiros (máx 10MB, só Gemini)
+    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+    if (files.length > 0) {
+        if (currentProvider !== 'gemini') {
+            alert('Anexos de ficheiros só são suportados com o provedor Gemini.');
+            files = [];
+        } else {
+            const oversized = files.filter(f => f.size > MAX_FILE_SIZE);
+            if (oversized.length > 0) {
+                alert(`Ficheiro(s) excede(m) 10MB: ${oversized.map(f => f.name).join(', ')}. Remova-os e tente novamente.`);
+                return;
+            }
+        }
+    }
+
     isSending = true;
-    sendBtn.disabled = true;
+    const stopBtn = document.getElementById('stop-btn');
+    sendBtn.style.display = 'none';
+    stopBtn.style.display = 'flex';
+
+    // AbortController
+    currentAbortController = new AbortController();
+    stopBtn.onclick = () => {
+        if (currentAbortController) currentAbortController.abort();
+    };
 
     hideWelcome();
     createMessage(text, 'user', files);
@@ -947,6 +1099,12 @@ async function sendMessage() {
     pendingFiles = [];
     renderPreviewStrip();
 
+    // Salva no histórico neutro
+    conversationHistory.push({ role: 'user', text });
+    if (conversationHistory.length > 20) {
+        conversationHistory = conversationHistory.slice(-20);
+    }
+
     // Rate limiting check
     if (rateLimitCooldown > 0) {
         const timeSince = Date.now() - lastSendTime;
@@ -954,7 +1112,8 @@ async function sendMessage() {
             const waitSec = Math.ceil((rateLimitCooldown - timeSince) / 1000);
             createMessage(`⏳ Aguarde ${waitSec}s antes de enviar outra mensagem.`, 'bot');
             isSending = false;
-            sendBtn.disabled = false;
+            sendBtn.style.display = 'flex';
+            stopBtn.style.display = 'none';
             return;
         }
     }
@@ -962,43 +1121,41 @@ async function sendMessage() {
 
     showTyping();
 
-    // Error retry (até 3 tentativas)
-    let lastError;
-    for (let attempt = 1; attempt <= 3; attempt++) {
-        try {
-            const botReply = await callGeminiAPI(text, files);
-            removeTyping();
+    try {
+        const result = await callAPI(text, files, currentAbortController.signal);
+        removeTyping();
 
-            // Streaming typewriter effect
-            const botContent = createMessage('', 'bot', [], false); // não salva vazio
-            const textDiv = botContent.querySelector('.msg-text') || document.createElement('div');
+        // Cria mensagem do bot com elemento de texto vazio para streaming
+        const botContent = createMessage('', 'bot', [], false);
+        let textDiv = botContent.querySelector('.msg-text');
+        if (!textDiv) {
+            textDiv = document.createElement('div');
             textDiv.classList.add('msg-text');
-            if (!botContent.querySelector('.msg-text')) botContent.insertBefore(textDiv, botContent.querySelector('.msg-feedback'));
+            botContent.insertBefore(textDiv, botContent.querySelector('.msg-feedback'));
+        }
 
-            await typewriterEffect(textDiv, botReply);
+        const botReply = await processStream(result, textDiv);
 
-            // Salva a resposta completa do bot
-            addMessageToChat('bot', botReply);
+        // Salva no histórico neutro
+        conversationHistory.push({ role: 'assistant', text: botReply });
+        if (conversationHistory.length > 20) {
+            conversationHistory = conversationHistory.slice(-20);
+        }
 
-            lastError = null;
-            break;
-        } catch (error) {
-            lastError = error;
-            console.warn(`Tentativa ${attempt}/3 falhou:`, error.message);
-            if (attempt < 3) {
-                await new Promise(r => setTimeout(r, 1000 * attempt));
-            }
+        addMessageToChat('bot', botReply);
+
+    } catch (error) {
+        removeTyping();
+        if (error.name !== 'AbortError') {
+            console.error('Erro na API:', error);
+            createMessage(`⚠️ Erro: ${error.message}`, 'bot');
         }
     }
 
-    if (lastError) {
-        removeTyping();
-        console.error('Erro na API Gemini após 3 tentativas:', lastError);
-        createMessage(`⚠️ Erro: ${lastError.message}`, 'bot');
-    }
-
+    currentAbortController = null;
     isSending = false;
-    sendBtn.disabled = false;
+    sendBtn.style.display = 'flex';
+    stopBtn.style.display = 'none';
     promptInput.focus();
 }
 
@@ -1066,7 +1223,7 @@ document.getElementById('export-chat').addEventListener('click', () => {
     const messages = chatMessages.querySelectorAll('.message');
     if (messages.length === 0) return;
 
-    let exportText = '=== SENAI GPT — Conversa Exportada ===\n';
+    let exportText = '=== INOVA SENAI \u2014 Conversa Exportada ===\n';
     exportText += `Data: ${new Date().toLocaleString('pt-BR')}\n\n`;
 
     messages.forEach(msg => {
@@ -1074,7 +1231,7 @@ document.getElementById('export-chat').addEventListener('click', () => {
         const avatar = msg.querySelector('.message-avatar');
         const content = msg.querySelector('.msg-text');
         if (!content) return;
-        const sender = avatar.classList.contains('bot') ? 'SENAI GPT' : 'Você';
+        const sender = avatar.classList.contains('bot') ? 'INOVA SENAI' : 'Voc\u00ea';
         exportText += `[${sender}]\n${content.textContent.trim()}\n\n`;
     });
 
@@ -1082,27 +1239,58 @@ document.getElementById('export-chat').addEventListener('click', () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `senai-gpt-${Date.now()}.txt`;
+    a.download = `inova-senai-${Date.now()}.txt`;
     a.click();
     URL.revokeObjectURL(url);
 });
 // ============================
-// Settings Panel
+// Settings Panel \u2014 Sistema H\u00edbrido
 // ============================
 const settingsOverlay = document.getElementById('settings-overlay');
 const settingsBtn = document.getElementById('settings-btn');
 const settingsClose = document.getElementById('settings-close');
 const settingsSave = document.getElementById('settings-save');
-const modelSelect = document.getElementById('model-select');
+const providerSelect = document.getElementById('provider-select');
+const tierSelect = document.getElementById('tier-select');
+const apiKeyInput = document.getElementById('api-key-input');
+const modelDisplay = document.getElementById('model-display');
+const openrouterUrlGroup = document.getElementById('openrouter-url-group');
+const openrouterUrlInput = document.getElementById('openrouter-url');
+const fetchModelsGroup = document.getElementById('fetch-models-group');
+const fetchModelsBtn = document.getElementById('fetch-models-btn');
+const freeModelsList = document.getElementById('free-models-list');
 const tempSlider = document.getElementById('temp-slider');
 const tempValue = document.getElementById('temp-value');
 const customPromptInput = document.getElementById('custom-prompt');
 
+// Fun\u00e7\u00e3o para atualizar modelo baseado em provedor/tier
+function updateModelFromTier() {
+    const model = TIER_MODELS[providerSelect.value]?.[tierSelect.value] || '';
+    modelDisplay.value = model;
+}
+
+// Provedor toggle: mostra/oculta campos OpenRouter
+function updateProviderUI() {
+    const isOR = providerSelect.value === 'openrouter';
+    openrouterUrlGroup.style.display = isOR ? 'block' : 'none';
+    fetchModelsGroup.style.display = isOR ? 'block' : 'none';
+    // Carrega API key do provedor atual
+    apiKeyInput.value = localStorage.getItem(`api-key-${providerSelect.value}`) || '';
+    updateModelFromTier();
+}
+
+providerSelect.addEventListener('change', updateProviderUI);
+tierSelect.addEventListener('change', updateModelFromTier);
+
 // Carrega valores salvos
-modelSelect.value = currentModel;
+providerSelect.value = currentProvider;
+tierSelect.value = currentTier;
 tempSlider.value = currentTemperature;
 tempValue.textContent = currentTemperature;
 customPromptInput.value = customPrompt;
+apiKeyInput.value = getApiKey();
+openrouterUrlInput.value = openrouterBaseUrl;
+updateProviderUI();
 
 // Marca personalidade ativa
 document.querySelectorAll('.personality-btn').forEach(btn => {
@@ -1132,10 +1320,49 @@ document.querySelectorAll('.personality-btn').forEach(btn => {
     });
 });
 
+// Buscar Modelos Free (OpenRouter)
+fetchModelsBtn.addEventListener('click', async () => {
+    freeModelsList.innerHTML = '<small>Buscando...</small>';
+    try {
+        const res = await fetch('https://openrouter.ai/api/v1/models');
+        const data = await res.json();
+        const freeModels = (data.data || []).filter(m => m.pricing?.prompt === '0' || m.id.includes(':free'));
+        if (freeModels.length === 0) {
+            freeModelsList.innerHTML = '<small>Nenhum modelo free encontrado.</small>';
+            return;
+        }
+        freeModelsList.innerHTML = freeModels.slice(0, 20).map(m =>
+            `<div class="free-model-item" data-model="${m.id}"><strong>${m.name || m.id}</strong><br><small>${m.id}</small></div>`
+        ).join('');
+        freeModelsList.querySelectorAll('.free-model-item').forEach(item => {
+            item.addEventListener('click', () => {
+                modelDisplay.value = item.dataset.model;
+                freeModelsList.innerHTML = '';
+            });
+        });
+    } catch (err) {
+        freeModelsList.innerHTML = `<small>Erro: ${err.message}</small>`;
+    }
+});
+
 settingsSave.addEventListener('click', () => {
+    // Salva provedor
+    currentProvider = providerSelect.value;
+    localStorage.setItem('ai-provider', currentProvider);
+
+    // Salva tier
+    currentTier = tierSelect.value;
+    localStorage.setItem('ai-tier', currentTier);
+
     // Salva modelo
-    currentModel = modelSelect.value;
-    localStorage.setItem('ai-model', currentModel);
+    currentModel = modelDisplay.value;
+
+    // Salva API key do provedor atual
+    localStorage.setItem(`api-key-${currentProvider}`, apiKeyInput.value.trim());
+
+    // Salva URL base OpenRouter
+    openrouterBaseUrl = openrouterUrlInput.value.trim();
+    localStorage.setItem('openrouter-url', openrouterBaseUrl);
 
     // Salva temperatura
     currentTemperature = parseFloat(tempSlider.value);
@@ -1152,7 +1379,7 @@ settingsSave.addEventListener('click', () => {
 
     // Fecha painel
     settingsOverlay.classList.remove('open');
-    createMessage('⚙️ Configurações salvas!', 'bot');
+    createMessage('\u2699\ufe0f Configura\u00e7\u00f5es salvas!', 'bot');
 });
 
 // ============================

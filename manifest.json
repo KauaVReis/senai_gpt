@@ -1,7 +1,7 @@
 {
-    "name": "SENAI GPT — Assistente IA",
-    "short_name": "SENAI GPT",
-    "description": "Assistente virtual inteligente do SENAI com IA Gemini",
+    "name": "INOVA SENAI — Assistente IA",
+    "short_name": "INOVA SENAI",
+    "description": "Assistente virtual inteligente do SENAI com IA multi-provedor",
     "start_url": "/kaua1/2026/aulaIA/chatBot1/index.html",
     "display": "standalone",
     "background_color": "#0f0f1a",

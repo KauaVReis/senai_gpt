@@ -4,8 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SENAI GPT — Assistente IA</title>
-    <meta name="description" content="SENAI GPT — Assistente de inteligência artificial do SENAI.">
+    <title>INOVA SENAI — Assistente IA</title>
+    <meta name="description" content="INOVA SENAI — Assistente de inteligência artificial do SENAI.">
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -22,7 +22,7 @@
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#dd203c">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-title" content="SENAI GPT">
+    <meta name="apple-mobile-web-app-title" content="INOVA SENAI">
 
     <!-- Estilos -->
     <link rel="stylesheet" href="style.css">
@@ -91,15 +91,55 @@
             </div>
 
             <div class="settings-body">
-                <!-- Modelo -->
+                <!-- Provedor -->
                 <div class="settings-group">
-                    <label class="settings-label">Modelo</label>
-                    <select id="model-select" class="settings-select">
-                        <option value="gemini-2.5-flash">Gemini 2.5 Flash (Rápido)</option>
-                        <option value="gemini-2.5-flash-preview-04-17">Gemini 2.5 Flash Preview</option>
-                        <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
-                        <option value="gemini-1.5-pro">Gemini 1.5 Pro (Avançado)</option>
+                    <label class="settings-label">Provedor de IA</label>
+                    <select id="provider-select" class="settings-select">
+                        <option value="gemini">Google Gemini</option>
+                        <option value="openrouter">OpenRouter</option>
                     </select>
+                </div>
+
+                <!-- API Key -->
+                <div class="settings-group">
+                    <label class="settings-label">Chave de API</label>
+                    <input type="password" id="api-key-input" class="settings-input"
+                        placeholder="Cole sua API Key aqui...">
+                    <small class="settings-hint" id="api-key-hint">Gemini: console.cloud.google.com | OpenRouter:
+                        openrouter.ai</small>
+                </div>
+
+                <!-- URL Base (OpenRouter only) -->
+                <div class="settings-group" id="openrouter-url-group" style="display:none">
+                    <label class="settings-label">URL Base (OpenRouter)</label>
+                    <input type="text" id="openrouter-url" class="settings-input"
+                        value="https://openrouter.ai/api/v1/chat/completions"
+                        placeholder="https://openrouter.ai/api/v1/chat/completions">
+                </div>
+
+                <!-- Senai TIERS -->
+                <div class="settings-group">
+                    <label class="settings-label">Senai TIERS (Nível da IA)</label>
+                    <select id="tier-select" class="settings-select">
+                        <option value="classic">⚡ Classic SENAI — Mais rápido, perguntas simples</option>
+                        <option value="perfect" selected>🎯 Perfect SENAI — Equilibrado, dia a dia</option>
+                        <option value="ultimate">🚀 Ultimate SENAI — Avançado, raciocínio e código</option>
+                        <option value="ultra">💎 Ultra SENAI — O mais forte, resolução complexa</option>
+                    </select>
+                </div>
+
+                <!-- Modelo (auto-preenchido) -->
+                <div class="settings-group">
+                    <label class="settings-label">Modelo <small>(auto-preenchido pelo Tier)</small></label>
+                    <input type="text" id="model-display" class="settings-input" readonly>
+                </div>
+
+                <!-- Buscar modelos free (OpenRouter) -->
+                <div class="settings-group" id="fetch-models-group" style="display:none">
+                    <button class="settings-save" id="fetch-models-btn" style="background:#6366f1">
+                        <i class="fas fa-search"></i> Buscar Modelos Free (OpenRouter)
+                    </button>
+                    <div id="free-models-list" class="free-models-list"></div>
                 </div>
 
                 <!-- Temperatura -->
@@ -114,7 +154,7 @@
 
                 <!-- Personalidade -->
                 <div class="settings-group">
-                    <label class="settings-label">Personalidade da IA</label>
+                    <label class="settings-label">Personalidade do Assistente</label>
                     <div class="personality-grid">
                         <button class="personality-btn active" data-personality="padrao">
                             <i class="fas fa-robot"></i>
@@ -162,10 +202,10 @@
             <!-- Welcome Screen -->
             <div class="welcome" id="welcome">
                 <div class="welcome-logo">
-                    <img src="img/SENAI-AI 1.png" alt="SENAI GPT Logo">
+                    <img src="img/SENAI-AI 1.png" alt="INOVA SENAI Logo">
                     <div class="logo-glow"></div>
                 </div>
-                <h1 class="welcome-title">SENAI <span class="accent">GPT</span></h1>
+                <h1 class="welcome-title">INOVA <span class="accent">SENAI</span></h1>
                 <p class="welcome-subtitle">Como posso te ajudar hoje?</p>
 
                 <div class="suggestion-cards">
@@ -217,9 +257,12 @@
                     <button class="input-btn send-btn" id="send-btn" title="Enviar">
                         <i class="fas fa-paper-plane"></i>
                     </button>
+                    <button class="input-btn stop-btn" id="stop-btn" title="Parar geração" style="display:none">
+                        <i class="fas fa-stop"></i>
+                    </button>
                 </div>
             </div>
-            <p class="disclaimer">SENAI GPT pode gerar informações imprecisas. Verifique as respostas importantes.</p>
+            <p class="disclaimer">INOVA SENAI pode gerar informações imprecisas. Verifique as respostas importantes.</p>
         </div>
 
     </main>
@@ -244,7 +287,6 @@
     </div>
 
     <!-- Scripts -->
-    <script src="config.js"></script>
     <script src="index.js"></script>
     <script>
         // PWA Service Worker
