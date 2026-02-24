@@ -1,4 +1,4 @@
-const CACHE_NAME = 'senai-gpt-v1';
+const CACHE_NAME = 'senai-gpt-v3';
 const ASSETS = [
     '/kaua1/2026/aulaIA/chatBot1/index.html',
     '/kaua1/2026/aulaIA/chatBot1/style.css',

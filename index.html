@@ -26,15 +26,25 @@
 
     <!-- Estilos -->
     <link rel="stylesheet" href="style.css">
+    <!-- Mermaid.js -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
 </head>
 
 <body class="dark-mode">
 
+    <!-- Focus Mode Exit Hint -->
+    <div class="focus-exit-hint" id="focus-exit-hint">
+        <i class="fas fa-compress"></i> Sair do Modo Foco (Esc)
+    </div>
+
     <!-- Sidebar -->
     <aside class="sidebar expanded" id="sidebar">
         <div class="sidebar-top">
-            <button class="sidebar-btn" id="new-chat" title="Novo chat">
+            <button class="sidebar-btn" id="new-chat" title="Novo chat (Ctrl+N)">
                 <i class="fas fa-plus"></i>
+            </button>
+            <button class="sidebar-btn" id="focus-btn" title="Modo Foco">
+                <i class="fas fa-expand"></i>
             </button>
             <button class="sidebar-btn sidebar-toggle" id="sidebar-toggle" title="Recolher sidebar">
                 <i class="fas fa-bars"></i>
@@ -44,14 +54,38 @@
         <!-- Chat History -->
         <div class="chat-history" id="chat-history">
             <div class="chat-history-label">Conversas</div>
+            <div class="chat-search-wrap">
+                <i class="fas fa-search"></i>
+                <input type="text" id="chat-search" placeholder="Buscar conversa... (Ctrl+K)" autocomplete="off">
+            </div>
+            <div class="tag-filter-bar" id="tag-filter-bar">
+                <button class="tag-pill active" data-tag="all">Todos</button>
+                <button class="tag-pill" data-tag="trabalho">💼 Trabalho</button>
+                <button class="tag-pill" data-tag="estudo">📚 Estudo</button>
+                <button class="tag-pill" data-tag="codigo">💻 Código</button>
+                <button class="tag-pill" data-tag="geral">📦 Geral</button>
+            </div>
             <div class="chat-history-list" id="chat-history-list">
                 <!-- Populated dynamically -->
             </div>
         </div>
 
         <div class="sidebar-bottom">
-            <button class="sidebar-btn" id="export-chat" title="Exportar conversa">
-                <i class="fas fa-download"></i>
+            <div class="export-wrap">
+                <button class="sidebar-btn" id="export-chat" title="Exportar conversa">
+                    <i class="fas fa-download"></i>
+                </button>
+                <div class="export-dropdown" id="export-dropdown">
+                    <div class="export-option" data-format="txt"><i class="fas fa-file-alt"></i> TXT</div>
+                    <div class="export-option" data-format="md"><i class="fab fa-markdown"></i> Markdown</div>
+                    <div class="export-option" data-format="pdf"><i class="fas fa-file-pdf"></i> PDF</div>
+                </div>
+            </div>
+            <button class="sidebar-btn" id="templates-btn" title="Prompt Templates">
+                <i class="fas fa-magic"></i>
+            </button>
+            <button class="sidebar-btn" id="agents-btn" title="Agentes Especializados">
+                <i class="fas fa-user-cog"></i>
             </button>
             <button class="sidebar-btn" id="share-chat" title="Compartilhar conversa">
                 <i class="fas fa-share-alt"></i>
@@ -76,11 +110,34 @@
             <button class="sidebar-btn" id="settings-btn" title="Configurações IA">
                 <i class="fas fa-sliders-h"></i>
             </button>
+            <button class="sidebar-btn mobile-history-btn" id="mobile-history-btn" title="Histórico">
+                <i class="fas fa-history"></i>
+            </button>
             <button class="sidebar-btn" id="toggle-mode" title="Alternar tema">
                 <i class="fas fa-moon"></i>
             </button>
         </div>
     </aside>
+
+    <!-- Mobile History Drawer -->
+    <div class="mobile-drawer-overlay" id="mobile-drawer-overlay">
+        <div class="mobile-drawer">
+            <div class="mobile-drawer-header">
+                <h3><i class="fas fa-history"></i> Conversas</h3>
+                <button class="settings-close" id="mobile-drawer-close"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="chat-search-wrap">
+                <i class="fas fa-search"></i>
+                <input type="text" id="mobile-chat-search" placeholder="Buscar conversa..." autocomplete="off">
+            </div>
+            <div class="mobile-drawer-list" id="mobile-drawer-list">
+                <!-- Populated dynamically -->
+            </div>
+            <div class="mobile-drawer-footer">
+                <button class="settings-save" id="mobile-new-chat"><i class="fas fa-plus"></i> Nova Conversa</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Settings Panel -->
     <div class="settings-overlay" id="settings-overlay">
@@ -186,6 +243,15 @@
                         placeholder="Escreva instruções personalizadas para a IA..."></textarea>
                     <small class="settings-hint">Deixe vazio para usar o prompt da personalidade selecionada</small>
                 </div>
+
+                <!-- Contexto Persistente -->
+                <div class="settings-group">
+                    <label class="settings-label">📌 Contexto Persistente <small>(vale para TODAS as
+                            conversas)</small></label>
+                    <textarea id="persistent-context" class="settings-textarea" rows="3"
+                        placeholder="Ex: Sempre responda em português. Eu sou aluno de TDS no SENAI SP."></textarea>
+                    <small class="settings-hint">Esta instrução será adicionada automaticamente a cada mensagem</small>
+                </div>
             </div>
 
             <div class="settings-footer">
@@ -262,7 +328,11 @@
                     </button>
                 </div>
             </div>
-            <p class="disclaimer">INOVA SENAI pode gerar informações imprecisas. Verifique as respostas importantes.</p>
+            <div class="disclaimer-row">
+                <p class="disclaimer">INOVA SENAI pode gerar informações imprecisas. Verifique as respostas importantes.
+                </p>
+                <span class="token-counter" id="token-counter" title="Estimativa de tokens na conversa">0 tokens</span>
+            </div>
         </div>
 
     </main>
@@ -282,6 +352,92 @@
                 <button class="webcam-capture-btn" id="webcam-capture">
                     <i class="fas fa-circle"></i> Capturar
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Prompt Templates Modal -->
+    <div class="templates-overlay" id="templates-overlay">
+        <div class="templates-panel">
+            <div class="templates-header">
+                <h3><i class="fas fa-magic"></i> Prompt Templates</h3>
+                <button class="settings-close" id="templates-close"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="templates-body">
+                <div class="template-card"
+                    data-template="Revise o seguinte código, identifique bugs, sugira melhorias de performance e boas práticas:">
+                    <i class="fas fa-code"></i>
+                    <div><strong>Revisar Código</strong><br><small>Identifica bugs e sugere melhorias</small></div>
+                </div>
+                <div class="template-card"
+                    data-template="Explique o conceito a seguir de forma didática, com exemplos práticos e analogias simples:">
+                    <i class="fas fa-book"></i>
+                    <div><strong>Explicar Conceito</strong><br><small>Didático com analogias</small></div>
+                </div>
+                <div class="template-card"
+                    data-template="Crie um plano de estudos detalhado e organizado por semanas para aprender o seguinte tema:">
+                    <i class="fas fa-calendar-alt"></i>
+                    <div><strong>Plano de Estudos</strong><br><small>Organizado por semanas</small></div>
+                </div>
+                <div class="template-card"
+                    data-template="Refatore o código abaixo seguindo os princípios SOLID, clean code e boas práticas:">
+                    <i class="fas fa-tools"></i>
+                    <div><strong>Refatorar Código</strong><br><small>SOLID e clean code</small></div>
+                </div>
+                <div class="template-card"
+                    data-template="Me ajude a debugar o seguinte erro. Explique a causa raiz e a solução passo a passo:">
+                    <i class="fas fa-bug"></i>
+                    <div><strong>Debug de Erro</strong><br><small>Causa raiz + solução</small></div>
+                </div>
+                <div class="template-card"
+                    data-template="Escreva um e-mail profissional sobre o seguinte assunto. Tom formal e objetivo:">
+                    <i class="fas fa-envelope"></i>
+                    <div><strong>Escrever E-mail</strong><br><small>Profissional e formal</small></div>
+                </div>
+                <div class="template-card"
+                    data-template="Resuma o seguinte texto em tópicos principais, mantendo as informações mais relevantes:">
+                    <i class="fas fa-compress-alt"></i>
+                    <div><strong>Resumir Texto</strong><br><small>Tópicos principais</small></div>
+                </div>
+                <div class="template-card"
+                    data-template="Traduza o seguinte texto para português brasileiro, mantendo o tom e contexto original:">
+                    <i class="fas fa-language"></i>
+                    <div><strong>Traduzir Texto</strong><br><small>Para PT-BR</small></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Agents Modal -->
+    <div class="templates-overlay" id="agents-overlay">
+        <div class="templates-panel">
+            <div class="templates-header">
+                <h3><i class="fas fa-user-cog"></i> Agentes Especializados</h3>
+                <button class="settings-close" id="agents-close"><i class="fas fa-times"></i></button>
+            </div>
+            <p style="padding: 0 20px; font-size: 0.82rem; color: var(--text-secondary);">Escolha um agente — ele
+                configura automaticamente o sistema de prompt ideal para a tarefa.</p>
+            <div class="templates-body">
+                <div class="template-card agent-card" data-agent="codigo"
+                    data-prompt="Você é um engenheiro de software sênior especializado em programação. Responda sempre com código limpo, comentado e seguindo boas práticas. Use exemplos práticos. Indique complexidade O(n). Sugira testes.">
+                    <i class="fas fa-code" style="color:#3b82f6"></i>
+                    <div><strong>Agente de Código</strong><br><small>Engenheiro de software sênior</small></div>
+                </div>
+                <div class="template-card agent-card" data-agent="redacao"
+                    data-prompt="Você é um redator profissional e revisor de textos. Escreva com clareza, coesão e coerência. Adapte o tom conforme pedido. Corrija gramática e sugira melhorias de estilo.">
+                    <i class="fas fa-pen-fancy" style="color:#f59e0b"></i>
+                    <div><strong>Agente de Redação</strong><br><small>Redator e revisor profissional</small></div>
+                </div>
+                <div class="template-card agent-card" data-agent="matematica"
+                    data-prompt="Você é um professor de matemática paciente e didático. Resolva problemas passo a passo. Use fórmulas LaTeX quando apropriado. Explique cada etapa com clareza.">
+                    <i class="fas fa-calculator" style="color:#06b6d4"></i>
+                    <div><strong>Agente de Matemática</strong><br><small>Professor didático e paciente</small></div>
+                </div>
+                <div class="template-card agent-card" data-agent="pesquisa"
+                    data-prompt="Você é um pesquisador acadêmico. Forneça informações precisas e bem fundamentadas. Cite fontes quando possível. Organize respostas em tópicos com introdução e conclusão.">
+                    <i class="fas fa-search-plus" style="color:#8b5cf6"></i>
+                    <div><strong>Agente de Pesquisa</strong><br><small>Pesquisador acadêmico</small></div>
+                </div>
             </div>
         </div>
     </div>

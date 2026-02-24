@@ -69,9 +69,12 @@ Responda sempre em português brasileiro de forma acolhedora.`
 
 let currentPersonality = localStorage.getItem('ai-personality') || 'padrao';
 let customPrompt = localStorage.getItem('ai-custom-prompt') || '';
+let persistentContext = localStorage.getItem('ai-persistent-context') || '';
 
 function getSystemInstruction() {
-    return customPrompt || PERSONALITIES[currentPersonality] || PERSONALITIES.padrao;
+    let base = customPrompt || PERSONALITIES[currentPersonality] || PERSONALITIES.padrao;
+    if (persistentContext) base += '\n\n[Contexto do Usuário]: ' + persistentContext;
+    return base;
 }
 
 // ============================
@@ -217,33 +220,107 @@ function deleteChat(chatId) {
     renderChatHistory();
 }
 
-function renderChatHistory() {
+let activeTagFilter = 'all';
+
+function renderChatHistory(searchQuery = '') {
     if (!chatHistoryList) return;
     chatHistoryList.innerHTML = '';
 
-    // Mais recente primeiro
-    const sorted = [...allChats].reverse();
-    sorted.forEach(chat => {
-        const item = document.createElement('div');
-        item.classList.add('chat-history-item');
-        if (chat.id === activeChatId) item.classList.add('active');
+    const mobileList = document.getElementById('mobile-drawer-list');
+    if (mobileList) mobileList.innerHTML = '';
 
-        item.innerHTML = `
-            <div class="chat-item-info" onclick="window._switchChat('${chat.id}')">
+    // Mais recente primeiro, com filtro de busca e tag
+    let sorted = [...allChats].reverse();
+    if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        sorted = sorted.filter(c => c.title.toLowerCase().includes(q));
+    }
+    if (activeTagFilter !== 'all') {
+        sorted = sorted.filter(c => (c.tag || 'geral') === activeTagFilter);
+    }
+
+    const TAG_LABELS = { trabalho: '💼', estudo: '📚', codigo: '💻', geral: '📦' };
+
+    sorted.forEach(chat => {
+        const tagLabel = chat.tag && chat.tag !== 'geral' ? `<span class="chat-item-tag">${TAG_LABELS[chat.tag] || ''} ${chat.tag}</span>` : '';
+        const html = `
+            <div class="chat-item-info">
                 <span class="chat-item-title">${chat.title}</span>
-                <span class="chat-item-date">${new Date(chat.createdAt).toLocaleDateString('pt-BR')}</span>
+                <span class="chat-item-date">${new Date(chat.createdAt).toLocaleDateString('pt-BR')}${tagLabel}</span>
             </div>
             <button class="chat-item-delete" onclick="event.stopPropagation(); window._deleteChat('${chat.id}')" title="Deletar">
                 <i class="fas fa-trash-alt"></i>
             </button>
         `;
+
+        // Sidebar item
+        const item = document.createElement('div');
+        item.classList.add('chat-history-item');
+        if (chat.id === activeChatId) item.classList.add('active');
+        item.innerHTML = html;
+        item.querySelector('.chat-item-info').addEventListener('click', () => window._switchChat(chat.id));
+        item.querySelector('.chat-item-title').addEventListener('dblclick', (e) => {
+            e.stopPropagation();
+            startRenameChat(chat.id, e.target);
+        });
+        // Right-click for tag
+        item.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            showTagContextMenu(e.clientX, e.clientY, chat.id);
+        });
         chatHistoryList.appendChild(item);
+
+        // Mobile drawer item
+        if (mobileList) {
+            const mItem = document.createElement('div');
+            mItem.classList.add('chat-history-item');
+            if (chat.id === activeChatId) mItem.classList.add('active');
+            mItem.innerHTML = html;
+            mItem.querySelector('.chat-item-info').addEventListener('click', () => {
+                window._switchChat(chat.id);
+                closeMobileDrawer();
+            });
+            mItem.querySelector('.chat-item-title').addEventListener('dblclick', (e) => {
+                e.stopPropagation();
+                startRenameChat(chat.id, e.target);
+            });
+            mobileList.appendChild(mItem);
+        }
     });
+}
+
+function startRenameChat(chatId, titleEl) {
+    const chat = allChats.find(c => c.id === chatId);
+    if (!chat) return;
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.classList.add('chat-item-title-edit');
+    input.value = chat.title;
+    titleEl.replaceWith(input);
+    input.focus();
+    input.select();
+
+    const finishRename = () => {
+        const newTitle = input.value.trim() || chat.title;
+        chat.title = newTitle;
+        saveChats();
+        renderChatHistory();
+    };
+
+    input.addEventListener('blur', finishRename);
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+        if (e.key === 'Escape') { input.value = chat.title; input.blur(); }
+    });
+}
+
+function closeMobileDrawer() {
+    document.getElementById('mobile-drawer-overlay')?.classList.remove('open');
 }
 
 // Expor para onclick inline
 window._switchChat = switchChat;
-window._deleteChat = deleteChat;
+window._deleteChat = (id) => { deleteChat(id); renderChatHistory(); };
 
 function showWelcome() {
     chatMessages.innerHTML = `
@@ -713,6 +790,25 @@ function formatMarkdown(text) {
     text = text.replace(/```(\w*)\n?([\s\S]*?)```/g, (match, lang, code) => {
         const index = codeBlocks.length;
         const language = lang || 'code';
+
+        // Mermaid diagram
+        if (language.toLowerCase() === 'mermaid') {
+            const mermaidSource = code.trim();
+            const escaped = mermaidSource.replace(/'/g, '\'').replace(/"/g, '&quot;');
+            codeBlocks.push(
+                `<div class="mermaid-container">` +
+                `<div class="mermaid-header">` +
+                `<span class="mermaid-label"><i class="fas fa-project-diagram"></i> Mermaid</span>` +
+                `<div class="mermaid-actions">` +
+                `<button onclick="copyMermaidCode(this)" title="Copiar código Mermaid"><i class="fas fa-code"></i> Código</button>` +
+                `<button onclick="copyMermaidImage(this)" title="Copiar como imagem"><i class="fas fa-image"></i> Imagem</button>` +
+                `</div></div>` +
+                `<div class="mermaid-body"><div class="mermaid" data-source="${escaped}">${mermaidSource}</div></div>` +
+                `</div>`
+            );
+            return `%%CODEBLOCK_${index}%%`;
+        }
+
         const escapedCode = code.replace(/</g, '&lt;').replace(/>/g, '&gt;').trimEnd();
 
         // Aplica syntax highlighting
@@ -1143,6 +1239,7 @@ async function sendMessage() {
         }
 
         addMessageToChat('bot', botReply);
+        playNotificationSound();
 
     } catch (error) {
         removeTyping();
@@ -1217,31 +1314,94 @@ window.handleFeedback = function (btn, type) {
 };
 
 // ============================
-// Exportar Chat
+// Exportar Chat (Dropdown multi-formato)
 // ============================
-document.getElementById('export-chat').addEventListener('click', () => {
+const exportBtn = document.getElementById('export-chat');
+const exportDropdown = document.getElementById('export-dropdown');
+
+exportBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    exportDropdown.classList.toggle('open');
+});
+
+document.addEventListener('click', () => exportDropdown?.classList.remove('open'));
+
+function getChatExportData() {
     const messages = chatMessages.querySelectorAll('.message');
-    if (messages.length === 0) return;
-
-    let exportText = '=== INOVA SENAI \u2014 Conversa Exportada ===\n';
-    exportText += `Data: ${new Date().toLocaleString('pt-BR')}\n\n`;
-
+    const items = [];
     messages.forEach(msg => {
         if (msg.id === 'typing-msg') return;
         const avatar = msg.querySelector('.message-avatar');
         const content = msg.querySelector('.msg-text');
         if (!content) return;
-        const sender = avatar.classList.contains('bot') ? 'INOVA SENAI' : 'Voc\u00ea';
-        exportText += `[${sender}]\n${content.textContent.trim()}\n\n`;
+        const sender = avatar.classList.contains('bot') ? 'INOVA SENAI' : 'Você';
+        items.push({ sender, text: content.textContent.trim() });
     });
+    return items;
+}
 
-    const blob = new Blob([exportText], { type: 'text/plain;charset=utf-8' });
+function exportAsTxt() {
+    const items = getChatExportData();
+    if (!items.length) return;
+    let txt = '=== INOVA SENAI \u2014 Conversa Exportada ===\n';
+    txt += `Data: ${new Date().toLocaleString('pt-BR')}\n\n`;
+    items.forEach(i => txt += `[${i.sender}]\n${i.text}\n\n`);
+    downloadFile(txt, `inova-senai-${Date.now()}.txt`, 'text/plain');
+}
+
+function exportAsMarkdown() {
+    const items = getChatExportData();
+    if (!items.length) return;
+    let md = '# INOVA SENAI \u2014 Conversa\n\n';
+    md += `> Exportada em ${new Date().toLocaleString('pt-BR')}\n\n---\n\n`;
+    items.forEach(i => {
+        const icon = i.sender === 'Você' ? '\ud83d\udde3\ufe0f' : '\ud83e\udd16';
+        md += `### ${icon} ${i.sender}\n\n${i.text}\n\n---\n\n`;
+    });
+    downloadFile(md, `inova-senai-${Date.now()}.md`, 'text/markdown');
+}
+
+function exportAsPdf() {
+    const items = getChatExportData();
+    if (!items.length) return;
+    const w = window.open('', '_blank');
+    w.document.write(`
+        <html><head><title>INOVA SENAI</title>
+        <style>
+            body { font-family: 'Segoe UI', sans-serif; max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+            h1 { color: #dd203c; border-bottom: 2px solid #dd203c; padding-bottom: 8px; }
+            .meta { color: #888; font-size: 0.85rem; margin-bottom: 24px; }
+            .msg { margin-bottom: 20px; padding: 12px 16px; border-radius: 8px; }
+            .user { background: #f0f0f5; border-left: 3px solid #dd203c; }
+            .bot { background: #fafafa; border-left: 3px solid #3b82f6; }
+            .sender { font-weight: 600; margin-bottom: 4px; font-size: 0.85rem; }
+            .text { white-space: pre-wrap; line-height: 1.6; }
+        </style></head><body>
+        <h1>INOVA SENAI</h1>
+        <p class="meta">Exportada em ${new Date().toLocaleString('pt-BR')}</p>
+        ${items.map(i => `<div class="msg ${i.sender === 'Voc\u00ea' ? 'user' : 'bot'}"><div class="sender">${i.sender}</div><div class="text">${i.text}</div></div>`).join('')}
+        </body></html>
+    `);
+    w.document.close();
+    setTimeout(() => { w.print(); }, 500);
+}
+
+function downloadFile(content, filename, type) {
+    const blob = new Blob([content], { type: type + ';charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url;
-    a.download = `inova-senai-${Date.now()}.txt`;
-    a.click();
+    a.href = url; a.download = filename; a.click();
     URL.revokeObjectURL(url);
+}
+
+document.querySelectorAll('.export-option').forEach(opt => {
+    opt.addEventListener('click', () => {
+        const format = opt.dataset.format;
+        if (format === 'txt') exportAsTxt();
+        if (format === 'md') exportAsMarkdown();
+        if (format === 'pdf') exportAsPdf();
+        exportDropdown.classList.remove('open');
+    });
 });
 // ============================
 // Settings Panel \u2014 Sistema H\u00edbrido
@@ -1290,6 +1450,8 @@ tempValue.textContent = currentTemperature;
 customPromptInput.value = customPrompt;
 apiKeyInput.value = getApiKey();
 openrouterUrlInput.value = openrouterBaseUrl;
+const pcInit = document.getElementById('persistent-context');
+if (pcInit) pcInit.value = persistentContext;
 updateProviderUI();
 
 // Marca personalidade ativa
@@ -1376,6 +1538,11 @@ settingsSave.addEventListener('click', () => {
     // Salva prompt personalizado
     customPrompt = customPromptInput.value.trim();
     localStorage.setItem('ai-custom-prompt', customPrompt);
+
+    // Salva contexto persistente
+    const pcInput = document.getElementById('persistent-context');
+    persistentContext = pcInput ? pcInput.value.trim() : '';
+    localStorage.setItem('ai-persistent-context', persistentContext);
 
     // Fecha painel
     settingsOverlay.classList.remove('open');
@@ -1661,4 +1828,364 @@ window.toggleStar = function (btn) {
         }
         saveChats();
     }
+};
+
+// ============================
+// RODADA 1 — Novas Features
+// ============================
+
+// 1. MODO FOCO
+const focusBtn = document.getElementById('focus-btn');
+const focusExitHint = document.getElementById('focus-exit-hint');
+
+function toggleFocusMode() {
+    document.body.classList.toggle('focus-mode');
+    const isFocus = document.body.classList.contains('focus-mode');
+    if (focusBtn) focusBtn.innerHTML = isFocus ? '<i class="fas fa-compress"></i>' : '<i class="fas fa-expand"></i>';
+}
+
+if (focusBtn) focusBtn.addEventListener('click', toggleFocusMode);
+if (focusExitHint) focusExitHint.addEventListener('click', toggleFocusMode);
+
+// 2. BUSCAR NAS CONVERSAS
+const chatSearchInput = document.getElementById('chat-search');
+if (chatSearchInput) {
+    chatSearchInput.addEventListener('input', () => {
+        renderChatHistory(chatSearchInput.value.trim());
+    });
+}
+
+const mobileChatSearch = document.getElementById('mobile-chat-search');
+if (mobileChatSearch) {
+    mobileChatSearch.addEventListener('input', () => {
+        renderChatHistory(mobileChatSearch.value.trim());
+    });
+}
+
+// 3. ATALHOS DE TECLADO
+document.addEventListener('keydown', (e) => {
+    // Ctrl+N — Novo chat
+    if (e.ctrlKey && e.key === 'n') {
+        e.preventDefault();
+        createNewChat();
+    }
+    // Ctrl+K — Focar na busca
+    if (e.ctrlKey && e.key === 'k') {
+        e.preventDefault();
+        if (chatSearchInput) {
+            if (!sidebar.classList.contains('expanded')) sidebar.classList.add('expanded');
+            chatSearchInput.focus();
+        }
+    }
+    // Ctrl+Shift+S — Abrir configurações
+    if (e.ctrlKey && e.shiftKey && e.key === 'S') {
+        e.preventDefault();
+        document.getElementById('settings-overlay')?.classList.add('open');
+    }
+    // Escape — Sair do modo foco ou fechar modais
+    if (e.key === 'Escape') {
+        if (document.body.classList.contains('focus-mode')) {
+            toggleFocusMode();
+        }
+        document.getElementById('settings-overlay')?.classList.remove('open');
+        closeMobileDrawer();
+    }
+});
+
+// 4. NOTIFICAÇÃO SONORA (Web Audio API)
+function playNotificationSound() {
+    try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, ctx.currentTime);
+        gain.gain.setValueAtTime(0.15, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.3);
+    } catch (e) { /* silent fallback */ }
+}
+
+// 5. HISTÓRICO MOBILE (Drawer)
+const mobileHistoryBtn = document.getElementById('mobile-history-btn');
+const mobileDrawerOverlay = document.getElementById('mobile-drawer-overlay');
+const mobileDrawerClose = document.getElementById('mobile-drawer-close');
+const mobileNewChat = document.getElementById('mobile-new-chat');
+
+if (mobileHistoryBtn) {
+    mobileHistoryBtn.addEventListener('click', () => {
+        renderChatHistory();
+        mobileDrawerOverlay?.classList.add('open');
+    });
+}
+if (mobileDrawerClose) mobileDrawerClose.addEventListener('click', closeMobileDrawer);
+if (mobileDrawerOverlay) {
+    mobileDrawerOverlay.addEventListener('click', (e) => {
+        if (e.target === mobileDrawerOverlay) closeMobileDrawer();
+    });
+}
+if (mobileNewChat) {
+    mobileNewChat.addEventListener('click', () => {
+        createNewChat();
+        closeMobileDrawer();
+    });
+}
+
+// ============================
+// RODADA 2 — Prompt Templates
+// ============================
+const templatesBtn = document.getElementById('templates-btn');
+const templatesOverlay = document.getElementById('templates-overlay');
+const templatesClose = document.getElementById('templates-close');
+
+if (templatesBtn) {
+    templatesBtn.addEventListener('click', () => {
+        templatesOverlay?.classList.add('open');
+    });
+}
+if (templatesClose) {
+    templatesClose.addEventListener('click', () => {
+        templatesOverlay?.classList.remove('open');
+    });
+}
+if (templatesOverlay) {
+    templatesOverlay.addEventListener('click', (e) => {
+        if (e.target === templatesOverlay) templatesOverlay.classList.remove('open');
+    });
+}
+
+document.querySelectorAll('.template-card').forEach(card => {
+    card.addEventListener('click', () => {
+        const template = card.dataset.template;
+        promptInput.value = template + ' ';
+        templatesOverlay?.classList.remove('open');
+        promptInput.focus();
+    });
+});
+
+// ============================
+// RODADA 2 — Contador de Tokens
+// ============================
+function estimateTokens(text) {
+    // Estimativa simples: ~4 chars por token (padrão GPT/Gemini)
+    return Math.ceil((text || '').length / 4);
+}
+
+function updateTokenCounter() {
+    const counter = document.getElementById('token-counter');
+    if (!counter) return;
+    const chat = getActiveChat();
+    if (!chat || !chat.messages?.length) {
+        counter.textContent = '0 tokens';
+        return;
+    }
+    const totalChars = chat.messages.reduce((sum, m) => sum + (m.text || '').length, 0);
+    const tokens = estimateTokens(totalChars.toString().repeat(0) || '') || Math.ceil(totalChars / 4);
+    counter.textContent = `~${Math.ceil(totalChars / 4)} tokens`;
+}
+
+// Atualiza ao carregar e após cada mensagem
+updateTokenCounter();
+const _origAddMsg = addMessageToChat;
+addMessageToChat = function (sender, text) {
+    _origAddMsg(sender, text);
+    updateTokenCounter();
+};
+
+// ============================
+// RODADA 3 — Tag Filter Pills
+// ============================
+document.querySelectorAll('.tag-pill').forEach(pill => {
+    pill.addEventListener('click', () => {
+        document.querySelectorAll('.tag-pill').forEach(p => p.classList.remove('active'));
+        pill.classList.add('active');
+        activeTagFilter = pill.dataset.tag;
+        renderChatHistory();
+    });
+});
+
+// ============================
+// RODADA 3 — Tag Context Menu (right-click)
+// ============================
+function showTagContextMenu(x, y, chatId) {
+    // Remove existing
+    document.querySelectorAll('.tag-context-menu').forEach(m => m.remove());
+
+    const menu = document.createElement('div');
+    menu.classList.add('tag-context-menu');
+    menu.style.left = x + 'px';
+    menu.style.top = y + 'px';
+
+    const tags = [
+        { tag: 'trabalho', label: '💼 Trabalho' },
+        { tag: 'estudo', label: '📚 Estudo' },
+        { tag: 'codigo', label: '💻 Código' },
+        { tag: 'geral', label: '📦 Geral' }
+    ];
+
+    tags.forEach(t => {
+        const item = document.createElement('div');
+        item.classList.add('tag-context-item');
+        item.textContent = t.label;
+        item.addEventListener('click', () => {
+            const chat = allChats.find(c => c.id === chatId);
+            if (chat) {
+                chat.tag = t.tag;
+                saveChats();
+                renderChatHistory();
+            }
+            menu.remove();
+        });
+        menu.appendChild(item);
+    });
+
+    document.body.appendChild(menu);
+
+    // Close on click outside
+    const closeMenu = (e) => {
+        if (!menu.contains(e.target)) {
+            menu.remove();
+            document.removeEventListener('click', closeMenu);
+        }
+    };
+    setTimeout(() => document.addEventListener('click', closeMenu), 10);
+}
+
+// ============================
+// RODADA 3 — Agentes Especializados
+// ============================
+let activeAgent = null;
+const agentsBtn = document.getElementById('agents-btn');
+const agentsOverlay = document.getElementById('agents-overlay');
+const agentsClose = document.getElementById('agents-close');
+
+if (agentsBtn) {
+    agentsBtn.addEventListener('click', () => {
+        agentsOverlay?.classList.add('open');
+    });
+}
+if (agentsClose) {
+    agentsClose.addEventListener('click', () => {
+        agentsOverlay?.classList.remove('open');
+    });
+}
+if (agentsOverlay) {
+    agentsOverlay.addEventListener('click', (e) => {
+        if (e.target === agentsOverlay) agentsOverlay.classList.remove('open');
+    });
+}
+
+document.querySelectorAll('.agent-card').forEach(card => {
+    card.addEventListener('click', () => {
+        const agentName = card.querySelector('strong').textContent;
+        const agentPrompt = card.dataset.prompt;
+        activeAgent = { name: agentName, prompt: agentPrompt };
+
+        // Set customPrompt to the agent's prompt
+        customPrompt = agentPrompt;
+        localStorage.setItem('ai-custom-prompt', customPrompt);
+        const cpInput = document.getElementById('custom-prompt');
+        if (cpInput) cpInput.value = customPrompt;
+
+        agentsOverlay?.classList.remove('open');
+
+        // Show active agent badge
+        document.querySelectorAll('.agent-active-badge').forEach(b => b.remove());
+        const badge = document.createElement('div');
+        badge.classList.add('agent-active-badge');
+        badge.innerHTML = `<i class="fas fa-user-cog"></i> ${agentName} <span style="opacity:0.5;font-size:0.65rem;">(clique p/ desativar)</span>`;
+        badge.addEventListener('click', () => {
+            activeAgent = null;
+            customPrompt = '';
+            localStorage.setItem('ai-custom-prompt', '');
+            const cpInput = document.getElementById('custom-prompt');
+            if (cpInput) cpInput.value = '';
+            badge.remove();
+            createMessage('🤖 Agente desativado. Voltando ao modo padrão.', 'bot');
+        });
+        document.body.appendChild(badge);
+
+        createMessage(`🤖 **${agentName}** ativado! O sistema agora está configurado como: "${agentPrompt.substring(0, 80)}..."`, 'bot');
+    });
+});
+
+// ============================
+// RODADA 3 — Mermaid Initialization
+// ============================
+if (typeof mermaid !== 'undefined') {
+    mermaid.initialize({
+        startOnLoad: false,
+        theme: 'dark',
+        securityLevel: 'loose'
+    });
+}
+
+function renderMermaidDiagrams() {
+    if (typeof mermaid === 'undefined') return;
+    const els = document.querySelectorAll('.mermaid:not([data-processed])');
+    els.forEach(async (el) => {
+        try {
+            el.setAttribute('data-processed', 'true');
+            const id = 'mermaid-' + Date.now() + Math.random().toString(36).substr(2, 5);
+            const { svg } = await mermaid.render(id, el.textContent.trim());
+            el.innerHTML = svg;
+        } catch (e) {
+            el.innerHTML = '<small style="color:var(--text-muted)">⚠️ Diagrama Mermaid inválido</small>';
+        }
+    });
+}
+
+// Call after each message append
+const __origCreateMsg = createMessage;
+createMessage = function (...args) {
+    const result = __origCreateMsg(...args);
+    setTimeout(renderMermaidDiagrams, 100);
+    return result;
+};
+
+// Initial render
+setTimeout(renderMermaidDiagrams, 500);
+
+// Copy Mermaid code
+window.copyMermaidCode = function (btn) {
+    const container = btn.closest('.mermaid-container');
+    const mermaidEl = container.querySelector('.mermaid');
+    const source = mermaidEl.dataset.source || mermaidEl.textContent;
+    navigator.clipboard.writeText('```mermaid\n' + source + '\n```').then(() => {
+        btn.innerHTML = '<i class="fas fa-check"></i> Copiado!';
+        setTimeout(() => btn.innerHTML = '<i class="fas fa-code"></i> Código', 2000);
+    });
+};
+
+// Copy Mermaid as image
+window.copyMermaidImage = function (btn) {
+    const container = btn.closest('.mermaid-container');
+    const svg = container.querySelector('svg');
+    if (!svg) {
+        btn.innerHTML = '<i class="fas fa-times"></i> Sem SVG';
+        setTimeout(() => btn.innerHTML = '<i class="fas fa-image"></i> Imagem', 2000);
+        return;
+    }
+    const svgData = new XMLSerializer().serializeToString(svg);
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const img = new Image();
+    img.onload = () => {
+        canvas.width = img.width * 2;
+        canvas.height = img.height * 2;
+        ctx.scale(2, 2);
+        ctx.fillStyle = '#1a1a2e';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0);
+        canvas.toBlob(blob => {
+            navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]).then(() => {
+                btn.innerHTML = '<i class="fas fa-check"></i> Copiado!';
+                setTimeout(() => btn.innerHTML = '<i class="fas fa-image"></i> Imagem', 2000);
+            });
+        }, 'image/png');
+    };
+    img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
 };
